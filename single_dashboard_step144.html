@@ -1,0 +1,3096 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartRoute - Emergency Vehicle Route Optimization (Dynamic Weighted Directed Graphs)</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+/* ==========================================================================
+   SmartRoute: Professional Emergency Vehicle Monitoring System Stylesheet
+   Theme: Modern Dark Navy Blue (#090e1a / #0f172a), High-Contrast Emergency Accents
+   ========================================================================== */
+
+:root {
+    --bg-darkest: #070b14;
+    --bg-dark: #0c1322;
+    --bg-card: #131c31;
+    --bg-card-hover: #192542;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-highlight: rgba(56, 189, 248, 0.3);
+    
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    
+    --emergency-red: #ef4444;
+    --emergency-red-glow: rgba(239, 68, 68, 0.25);
+    --alert-amber: #f59e0b;
+    --alert-amber-glow: rgba(245, 158, 11, 0.25);
+    --status-green: #10b981;
+    --status-green-glow: rgba(16, 185, 129, 0.25);
+    --cyber-blue: #0ea5e9;
+    --cyber-cyan: #06b6d4;
+    --forest-green: #059669;
+
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-darkest);
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ==========================================================================
+   Header & Top Navigation
+   ========================================================================== */
+.top-header {
+    background-color: var(--bg-dark);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.brand-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.brand-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #ef4444, #991b1b);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 15px var(--emergency-red-glow);
+}
+
+.brand-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.brand-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.role-switcher {
+    display: flex;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 4px;
+}
+
+.role-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 0.45rem 0.9rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.role-btn:hover {
+    color: var(--text-primary);
+}
+
+.role-btn.active {
+    background-color: var(--cyber-blue);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(14, 165, 233, 0.4);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.gps-live-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid var(--status-green);
+    color: var(--status-green);
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.gps-live-pill.lost {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: var(--emergency-red);
+    color: var(--emergency-red);
+    animation: pulse-danger 1s infinite alternate;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+/* ==========================================================================
+   Banner Alerts (Forest Warning & GPS Loss Watchdog)
+   ========================================================================== */
+.alert-banner-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem 1.5rem 0;
+}
+
+.banner-alert {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    animation: slideDown 0.3s ease;
+}
+
+.banner-alert.visible {
+    display: flex;
+}
+
+.banner-alert.red {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid var(--emergency-red);
+    color: #fca5a5;
+    box-shadow: 0 4px 20px var(--emergency-red-glow);
+}
+
+.banner-alert.amber {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid var(--alert-amber);
+    color: #fcd34d;
+    box-shadow: 0 4px 20px var(--alert-amber-glow);
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.banner-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.banner-btn {
+    border: none;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-bypass {
+    background-color: var(--status-green);
+    color: #ffffff;
+}
+.btn-bypass:hover {
+    background-color: #059669;
+}
+
+.btn-continue {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+}
+.btn-continue:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ==========================================================================
+   KPI Summary Metric Cards
+   ========================================================================== */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+}
+
+.metric-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-highlight);
+}
+
+.metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.metric-value {
+    font-size: 1.85rem;
+    font-weight: 800;
+    margin: 0.4rem 0;
+    color: #ffffff;
+}
+
+.metric-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Main Layout: Map & Control Room Panels
+   ========================================================================== */
+.main-content {
+    display: grid;
+    grid-template-columns: 1fr 390px;
+    gap: 1rem;
+    padding: 0 1.5rem 1.5rem;
+    height: calc(100vh - 220px);
+    min-height: 540px;
+}
+
+.map-container-wrapper {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-dark);
+    transition: all 0.25s ease-in-out;
+}
+
+/* Moveable & Resizable Map States: Maximize / Fullscreen & Minimize */
+.map-container-wrapper.maximized {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+
+.map-container-wrapper.minimized {
+    height: 260px !important;
+}
+
+/* Floating Map Controls Toolbar (Top Right) */
+.map-controls-toolbar {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    pointer-events: auto;
+}
+
+.map-tool-btn {
+    width: 36px;
+    height: 36px;
+    background: rgba(12, 19, 34, 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.map-tool-btn:hover {
+    background: var(--cyber-blue);
+    color: #ffffff;
+    border-color: var(--cyber-cyan);
+    transform: scale(1.05);
+}
+
+.map-tool-btn:active {
+    transform: scale(0.95);
+}
+
+/* Live GPS Pulse Accuracy Circle */
+.user-live-pin {
+    width: 18px;
+    height: 18px;
+    background: #38bdf8;
+    border: 2.5px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 14px #38bdf8;
+    position: relative;
+}
+
+.user-live-pin::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(56, 189, 248, 0.4);
+    animation: live-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes live-ping {
+    0% { transform: scale(0.6); opacity: 1; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+    background-color: #0c1322;
+}
+
+/* Floating Map HUD */
+.map-hud-overlay {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 500;
+    background: rgba(12, 19, 34, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-highlight);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    color: #ffffff;
+    pointer-events: auto;
+}
+
+.hud-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--cyber-cyan);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.hud-stats {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+}
+
+.hud-stat-item span {
+    color: var(--text-secondary);
+}
+
+.hud-stat-item strong {
+    color: #ffffff;
+    font-family: var(--font-mono);
+}
+
+/* Map Legend */
+.map-legend {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 1rem;
+    z-index: 500;
+    background: rgba(12, 19, 34, 0.9);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.legend-color-box {
+    width: 14px;
+    height: 4px;
+    border-radius: 2px;
+}
+
+/* Side Command Panel */
+.side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+}
+
+.panel-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panel-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+/* ==========================================================================
+   Simulation Control Studio Bar
+   ========================================================================== */
+.demo-control-bar {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.85rem 1.25rem;
+    margin: 0 1.5rem 1rem;
+}
+
+.demo-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.65rem;
+}
+
+.demo-badge {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--cyber-blue);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.demo-buttons-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.btn-demo {
+    background-color: var(--bg-card-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.45rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.btn-demo:hover {
+    background-color: #223259;
+    border-color: var(--cyber-blue);
+}
+
+.btn-demo.danger:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    border-color: var(--emergency-red);
+    color: #fca5a5;
+}
+
+.btn-demo.success:hover {
+    background-color: rgba(16, 185, 129, 0.2);
+    border-color: var(--status-green);
+    color: #6ee7b7;
+}
+
+/* ==========================================================================
+   Driver Cabin Screen View (Driver Friendly HUD)
+   ========================================================================== */
+.driver-cabin-view {
+    display: none;
+    padding: 1.5rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.driver-cabin-view.active {
+    display: block;
+}
+
+.driver-hud-card {
+    background: linear-gradient(145deg, #0f182c, #090e1a);
+    border: 2px solid var(--border-highlight);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.driver-profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.driver-info-box h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.driver-info-box p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.driver-turn-instruction {
+    background-color: rgba(14, 165, 233, 0.1);
+    border-left: 5px solid var(--cyber-blue);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.driver-turn-icon {
+    font-size: 2.2rem;
+    color: var(--cyber-blue);
+}
+
+.driver-turn-text h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.driver-turn-text p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.driver-telemetry-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.telemetry-tile {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.telemetry-tile .label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.telemetry-tile .val {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #ffffff;
+    font-family: var(--font-mono);
+    margin-top: 0.25rem;
+}
+
+.driver-decision-panel {
+    background: rgba(239, 68, 68, 0.12);
+    border: 2px solid var(--emergency-red);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-top: 1.5rem;
+    display: none;
+}
+
+.driver-decision-panel.active {
+    display: block;
+    animation: pulse-border 1.5s infinite alternate;
+}
+
+.decision-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.btn-big-choice {
+    flex: 1;
+    padding: 1rem;
+    border-radius: 10px;
+    border: none;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+
+.btn-big-choice:active {
+    transform: scale(0.98);
+}
+
+/* ==========================================================================
+   Modals & Popups (Driver Login, C Code Inspector, Graph Viewer)
+   ========================================================================== */
+.modal-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(4, 8, 16, 0.85);
+    backdrop-filter: blur(6px);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.modal-backdrop.active {
+    display: flex;
+}
+
+.modal-window {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-highlight);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 600px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+    animation: modalPop 0.25s ease-out;
+}
+
+.modal-window.large {
+    max-width: 850px;
+}
+
+.modal-header {
+    background-color: var(--bg-dark);
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    font-size: 1.15rem;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.modal-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.form-group {
+    margin-bottom: 1.15rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.35rem;
+}
+
+.form-input, .form-select {
+    width: 100%;
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+
+.form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: var(--cyber-blue);
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+}
+
+.profile-quick-picks {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.65rem;
+    margin-bottom: 1.25rem;
+}
+
+.quick-pick-card {
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quick-pick-card:hover {
+    border-color: var(--cyber-blue);
+    background-color: rgba(14, 165, 233, 0.1);
+}
+
+.quick-pick-card.selected {
+    border-color: var(--status-green);
+    background-color: rgba(16, 185, 129, 0.15);
+}
+
+.btn-primary {
+    background-color: var(--cyber-blue);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: #0284c7;
+}
+
+/* ==========================================================================
+   Code & Graph Adjacency List Box
+   ========================================================================== */
+.code-container {
+    background-color: #050912;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: #e2e8f0;
+    max-height: 480px;
+    overflow: auto;
+    white-space: pre;
+    line-height: 1.45;
+}
+
+/* ==========================================================================
+   Alerts & Notifications Feed
+   ========================================================================== */
+.alert-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.alert-item {
+    background-color: var(--bg-dark);
+    border-left: 4px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.82rem;
+    transition: transform 0.15s;
+}
+
+.alert-item.critical {
+    border-left-color: var(--emergency-red);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.alert-item.warning {
+    border-left-color: var(--alert-amber);
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.alert-item.info {
+    border-left-color: var(--cyber-blue);
+}
+
+.alert-item.success {
+    border-left-color: var(--status-green);
+}
+
+.alert-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+/* ==========================================================================
+   Leaflet Custom Elements & Animations
+   ========================================================================== */
+.ambulance-marker-icon {
+    transition: transform 0.3s ease-out;
+}
+
+.siren-beacon {
+    width: 32px;
+    height: 32px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.siren-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.6) 0%, rgba(239, 68, 68, 0) 70%);
+    animation: siren-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes siren-ping {
+    0% { transform: scale(0.6); opacity: 1; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes pulse-danger {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    100% { transform: scale(1.02); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+
+@keyframes pulse-border {
+    0% { border-color: rgba(239, 68, 68, 0.4); }
+    100% { border-color: rgba(239, 68, 68, 1); }
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes modalPop {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .main-content {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+    .map-container-wrapper {
+        height: 480px;
+    }
+}
+
+</style>
+</head>
+<body>
+
+    <!-- TOP CONTROL HEADER -->
+    <header class="top-header">
+        <div class="brand-badge">
+            <div class="brand-icon">
+                <i data-lucide="siren" style="color: white; width: 22px; height: 22px;"></i>
+            </div>
+            <div>
+                <h1 class="brand-title">SmartRoute <span style="font-size:0.75rem; background:rgba(14,165,233,0.2); color:#38bdf8; padding:2px 8px; border-radius:4px; font-weight:600;">v2.4 CAD</span></h1>
+                <p class="brand-subtitle">Emergency Vehicle Route Optimization &bull; Dynamic Weighted Directed Graphs</p>
+            </div>
+        </div>
+
+        <!-- Role View Switcher: Operator vs Driver -->
+        <div class="role-switcher">
+            <button class="role-btn active" id="btnRoleOperator" onclick="switchRole('operator')">
+                <i data-lucide="layout-dashboard" style="width: 16px; height: 16px;"></i>
+                Operator Control
+            </button>
+            <button class="role-btn" id="btnRoleDriver" onclick="switchRole('driver')">
+                <i data-lucide="navigation" style="width: 16px; height: 16px;"></i>
+                Driver Cabin
+            </button>
+        </div>
+
+        <!-- Live Telemetry Status & Actions -->
+        <div class="header-actions">
+            <button class="btn-demo" id="btnUseLiveLocation" onclick="fetchUserLiveLocation()" title="Anchor map and graph to your real area location">
+                <i data-lucide="map-pin" style="width: 15px; height: 15px; color:#38bdf8;"></i>
+                Use My Area Location
+            </button>
+
+            <button class="btn-demo" id="btnOpenDriverLogin" onclick="openDriverLoginModal()">
+                <i data-lucide="user-check" style="width: 15px; height: 15px; color:#10b981;"></i>
+                <span id="headerDriverName">Driver: Rajesh Kumar (AMB-101)</span>
+            </button>
+
+            <div class="gps-live-pill" id="headerGpsPill">
+                <span class="pulse-dot"></span>
+                <span id="headerGpsText">GPS: CONNECTED</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- EMERGENCY BANNERS (Forest Proximity, Forest Entry, GPS Watchdog Loss) -->
+    <div class="alert-banner-container">
+        <!-- Forest Entry Alert Banner (Red) -->
+        <div class="banner-alert red" id="bannerForestEntry">
+            <div class="banner-content">
+                <i data-lucide="alert-octagon" style="width: 24px; height: 24px; color: #ef4444;"></i>
+                <div>
+                    <strong>RED ALERT: AMBULANCE ENTERED PROTECTED FOREST REGION!</strong>
+                    <div style="font-size: 0.8rem; font-weight: 500;">Eco-Sensitive Reserve. Cellular coverage low & wildlife collision hazard. Review route options.</div>
+                </div>
+            </div>
+            <div class="banner-actions">
+                <button class="banner-btn btn-bypass" onclick="driverChooseRoute(true)">Switch to Highway Bypass</button>
+                <button class="banner-btn btn-continue" onclick="driverChooseRoute(false)">Continue Current Route</button>
+            </div>
+        </div>
+
+        <!-- Forest Approaching Warning (Amber) -->
+        <div class="banner-alert amber" id="bannerForestApproach">
+            <div class="banner-content">
+                <i data-lucide="alert-triangle" style="width: 22px; height: 22px; color: #f59e0b;"></i>
+                <div>
+                    <strong>WARNING: You are approaching a Forest Area. Please review the route before proceeding.</strong>
+                    <div style="font-size: 0.78rem; font-weight: 500;" id="bannerForestDistText">Boundary distance: ~450m ahead. Highway bypass available.</div>
+                </div>
+            </div>
+            <div class="banner-actions">
+                <button class="banner-btn btn-bypass" onclick="driverChooseRoute(true)">Pre-emptively Bypass</button>
+                <button class="banner-btn btn-continue" onclick="dismissBanner('bannerForestApproach')">Dismiss</button>
+            </div>
+        </div>
+
+        <!-- GPS Connection Lost Banner (15s Watchdog) -->
+        <div class="banner-alert red" id="bannerGpsLost">
+            <div class="banner-content">
+                <i data-lucide="wifi-off" style="width: 24px; height: 24px; color: #ef4444;"></i>
+                <div>
+                    <strong>GPS CONNECTION LOST â€“ Ambulance location is no longer updating!</strong>
+                    <div style="font-size: 0.8rem; font-weight: 500;" id="bannerGpsLostDetails">
+                        Vehicle: AMB-101 | Last Ping: 16s ago | Displaying estimated dead-reckoning coordinates.
+                    </div>
+                </div>
+            </div>
+            <div class="banner-actions">
+                <button class="banner-btn btn-bypass" onclick="restoreGpsConnection()">Restore GPS Signal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD METRICS (6 KPI Cards) -->
+    <section class="metrics-grid" id="metricsGrid">
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Active Ambulances</span>
+                <i data-lucide="truck" style="width: 16px; height: 16px; color:#38bdf8;"></i>
+            </div>
+            <div class="metric-value" id="kpiActiveAmbulances">4</div>
+            <div class="metric-sub">Fleet ready for dispatch</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Emergency Duty</span>
+                <i data-lucide="flame" style="width: 16px; height: 16px; color:#ef4444;"></i>
+            </div>
+            <div class="metric-value" id="kpiEmergencyDuty" style="color: #ef4444;">1</div>
+            <div class="metric-sub">Active sirens & transit</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Active Routes</span>
+                <i data-lucide="git-branch" style="width: 16px; height: 16px; color:#10b981;"></i>
+            </div>
+            <div class="metric-value" id="kpiActiveRoutes">2</div>
+            <div class="metric-sub">Dijkstra Min-Heap optimal</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>GPS Watchdog</span>
+                <i data-lucide="satellite" style="width: 16px; height: 16px; color:#10b981;"></i>
+            </div>
+            <div class="metric-value" id="kpiGpsStatus" style="color: #10b981; font-size:1.4rem;">CONNECTED</div>
+            <div class="metric-sub" id="kpiGpsSub">Ping delay: 1.0s (15s threshold)</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Forest Warnings</span>
+                <i data-lucide="trees" style="width: 16px; height: 16px; color:#059669;"></i>
+            </div>
+            <div class="metric-value" id="kpiForestStatus" style="font-size:1.4rem; color: #10b981;">CLEAR</div>
+            <div class="metric-sub" id="kpiForestSub">Eco-reserve proximity</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Traffic Status</span>
+                <i data-lucide="activity" style="width: 16px; height: 16px; color:#f59e0b;"></i>
+            </div>
+            <div class="metric-value" id="kpiTrafficStatus" style="font-size:1.4rem; color: #10b981;">OPTIMAL</div>
+            <div class="metric-sub" id="kpiTrafficSub">Dynamic edge weights</div>
+        </div>
+    </section>
+
+    <!-- DEMO & FACULTY EVALUATION CONTROL BAR -->
+    <div class="demo-control-bar">
+        <div class="demo-title-row">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="demo-badge">VIVA / EVALUATION STUDIO</span>
+                <span style="font-size: 0.85rem; font-weight: 600; color: #ffffff;">Interactive Scenario Simulator</span>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn-demo" onclick="openGraphInspector()">
+                    <i data-lucide="network" style="width: 14px; height: 14px; color:#38bdf8;"></i>
+                    Adjacency List
+                </button>
+                <button class="btn-demo" onclick="openCodeInspector()">
+                    <i data-lucide="code" style="width: 14px; height: 14px; color:#10b981;"></i>
+                    View C Program
+                </button>
+            </div>
+        </div>
+
+        <div class="demo-buttons-grid">
+            <button class="btn-demo success" id="btnToggleTracking" onclick="toggleAmbulanceTracking()">
+                <i data-lucide="play" style="width: 14px; height: 14px;"></i>
+                <span id="btnTrackingText">Start GPS Tracking</span>
+            </button>
+            <button class="btn-demo" onclick="simulateApproachForest()">
+                <i data-lucide="compass" style="width: 14px; height: 14px; color:#f59e0b;"></i>
+                Simulate Forest Approach
+            </button>
+            <button class="btn-demo danger" onclick="simulateEnterForest()">
+                <i data-lucide="trees" style="width: 14px; height: 14px; color:#ef4444;"></i>
+                Simulate Forest Entry
+            </button>
+            <button class="btn-demo danger" onclick="simulateGpsLoss()">
+                <i data-lucide="wifi-off" style="width: 14px; height: 14px; color:#ef4444;"></i>
+                Simulate GPS Loss (15s Watchdog)
+            </button>
+            <button class="btn-demo success" onclick="restoreGpsConnection()">
+                <i data-lucide="refresh-cw" style="width: 14px; height: 14px; color:#10b981;"></i>
+                Restore GPS Signal
+            </button>
+            <button class="btn-demo" onclick="simulateTrafficJam()">
+                <i data-lucide="alert-octagon" style="width: 14px; height: 14px; color:#f59e0b;"></i>
+                Inject Heavy Traffic (Reroute)
+            </button>
+            <button class="btn-demo" onclick="recalculateOptimalRoute()">
+                <i data-lucide="zap" style="width: 14px; height: 14px; color:#06b6d4;"></i>
+                Recalculate Dijkstra
+            </button>
+            <button class="btn-demo" onclick="resetDemo()">
+                <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
+                Reset Simulation
+            </button>
+        </div>
+    </div>
+
+    <!-- OPERATOR CONTROL ROOM VIEW (Default) -->
+    <main class="main-content" id="operatorView">
+        <!-- Interactive Moveable Map Container -->
+        <div class="map-container-wrapper" id="mainMapWrapper">
+            <div id="map"></div>
+
+            <!-- Floating Map Controls Toolbar (Moveable/Maximize/Minimize/Recenter) -->
+            <div class="map-controls-toolbar">
+                <button class="map-tool-btn" id="btnToggleMaximize" onclick="toggleMapMaximize()" title="Maximize / Fullscreen Map (F)">
+                    <i data-lucide="maximize-2" id="iconMaximize" style="width: 18px; height: 18px;"></i>
+                </button>
+                <button class="map-tool-btn" id="btnToggleMinimize" onclick="toggleMapMinimize()" title="Minimize / Compact View">
+                    <i data-lucide="minimize-2" id="iconMinimize" style="width: 18px; height: 18px;"></i>
+                </button>
+                <button class="map-tool-btn" id="btnRecenterGps" onclick="recenterToLiveLocation()" title="Recenter on My Live Location">
+                    <i data-lucide="crosshair" style="width: 18px; height: 18px; color: #38bdf8;"></i>
+                </button>
+            </div>
+
+            <!-- Floating Map HUD Overlay -->
+            <div class="map-hud-overlay">
+                <div class="flex justify-between items-center">
+                    <div class="hud-title">Live CAD Telemetry &bull; AMB-101</div>
+                    <span id="hudAreaBadge" style="font-size: 0.68rem; background: rgba(56, 189, 248, 0.2); color:#38bdf8; padding: 1px 6px; border-radius: 4px; font-weight: 600;">Detecting Live Area...</span>
+                </div>
+                <div class="hud-stats">
+                    <div class="hud-stat-item">
+                        <span>Speed:</span> <strong id="hudSpeed">58 km/h</strong>
+                    </div>
+                    <div class="hud-stat-item">
+                        <span>Route ETA:</span> <strong id="hudEta">6 mins</strong>
+                    </div>
+                    <div class="hud-stat-item">
+                        <span>Distance:</span> <strong id="hudDist">10.7 km</strong>
+                    </div>
+                    <div class="hud-stat-item">
+                        <span>Mode:</span> <strong id="hudMode" style="color:#10b981;">Optimal</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Legend -->
+            <div class="map-legend">
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background:#06b6d4;"></div>
+                    <span>Active Emergency Route</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background:#64748b; border: 1px dashed white;"></div>
+                    <span>Alternative / Original Route</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background:rgba(5, 150, 105, 0.7);"></div>
+                    <span>Protected Forest Geofence</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background:#ef4444;"></div>
+                    <span>Heavy Traffic / Congestion</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Side Command & Monitoring Panel -->
+        <aside class="side-panel">
+            <!-- Active Route Summary Card -->
+            <div class="panel-card">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <i data-lucide="route" style="color:#38bdf8; width:18px; height:18px;"></i>
+                        Active Route Details
+                    </h2>
+                    <span class="demo-badge" id="routeTagBadge">Dijkstra Min-Heap</span>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                    Origin: <strong style="color:white;" id="routeOriginName">Emergency Scene</strong>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                    Destination: <strong style="color:#ef4444;" id="routeDestName">Apollo Trauma Center</strong>
+                </div>
+
+                <!-- Node Path Visualizer -->
+                <div style="background: var(--bg-dark); padding: 0.65rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.75rem; color: #38bdf8; word-break: break-all; margin-bottom: 0.75rem;" id="routeNodesText">
+                    Node 0 &rarr; Node 1 &rarr; Node 2 &rarr; Node 3 &rarr; Node 4 &rarr; Node 7
+                </div>
+
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; border-top:1px solid var(--border-color); padding-top:0.5rem;">
+                    <span>Total Length: <strong style="color:white;" id="sideDist">10.7 km</strong></span>
+                    <span>Transit Time: <strong style="color:#10b981;" id="sideEta">~6 mins</strong></span>
+                </div>
+            </div>
+
+            <!-- Ambulance Fleet Status -->
+            <div class="panel-card">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <i data-lucide="shield" style="color:#10b981; width:18px; height:18px;"></i>
+                        Ambulance Fleet
+                    </h2>
+                    <button class="btn-demo" style="padding: 2px 8px; font-size: 0.7rem;" onclick="dispatchNewAmbulance()">+ Dispatch</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; font-size: 0.78rem; text-align: left; border-collapse: collapse;">
+                        <thead>
+                            <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
+                                <th style="padding: 4px 0;">ID</th>
+                                <th>Driver</th>
+                                <th>GPS</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleetTableBody">
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                <td style="padding: 6px 0; font-weight:700; color:#38bdf8;">AMB-101</td>
+                                <td>Rajesh Kumar</td>
+                                <td><span style="color:#10b981;" id="tblGps101">&bull; Active</span></td>
+                                <td><span style="color:#ef4444; font-weight:600;">ON DUTY</span></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                <td style="padding: 6px 0; font-weight:700;">AMB-104</td>
+                                <td>Priya Sharma</td>
+                                <td><span style="color:#10b981;">&bull; Active</span></td>
+                                <td><span style="color:#10b981;">STANDBY</span></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                <td style="padding: 6px 0; font-weight:700;">AMB-202</td>
+                                <td>Vikram Singh</td>
+                                <td><span style="color:#10b981;">&bull; Active</span></td>
+                                <td><span style="color:#10b981;">STANDBY</span></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 0; font-weight:700;">AMB-305</td>
+                                <td>Anil Varma</td>
+                                <td><span style="color:#10b981;">&bull; Active</span></td>
+                                <td><span style="color:#10b981;">STANDBY</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Alerts & Notification Feed -->
+            <div class="panel-card" style="flex: 1;">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <i data-lucide="bell" style="color:#f59e0b; width:18px; height:18px;"></i>
+                        Control Center Alerts
+                    </h2>
+                    <span style="font-size:0.75rem; color:var(--text-muted); cursor:pointer;" onclick="clearAlerts()">Clear</span>
+                </div>
+                <div class="alert-feed" id="alertFeedContainer">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- DRIVER CABIN IN-CAB HUD VIEW (Driver Friendly, High Contrast) -->
+    <section class="driver-cabin-view" id="driverCabinView">
+        <div class="driver-hud-card">
+            <!-- Driver Profile Header -->
+            <div class="driver-profile-header">
+                <div class="driver-info-box">
+                    <h2 id="cabDriverName">Driver: Rajesh Kumar</h2>
+                    <p>Ambulance ID: <strong style="color:#38bdf8;" id="cabAmbulanceId">AMB-101</strong> &bull; Emergency Unit: Type-C Advanced Cardiac</p>
+                </div>
+                <div style="text-align: right;">
+                    <div class="gps-live-pill" id="cabGpsPill" style="display:inline-flex;">
+                        <span class="pulse-dot"></span>
+                        <span id="cabGpsText">GPS ACTIVE</span>
+                    </div>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Destination: Apollo Trauma Center</p>
+                </div>
+            </div>
+
+            <!-- Turn Guidance HUD -->
+            <div class="driver-turn-instruction">
+                <div class="driver-turn-icon" id="turnIcon">
+                    <i data-lucide="arrow-up-right" style="width: 40px; height: 40px;"></i>
+                </div>
+                <div class="driver-turn-text">
+                    <h3 id="turnInstructionTitle">Continue Straight on Boulevard Link</h3>
+                    <p id="turnInstructionSub">Approaching North Boulevard Junction in 1.2 km &bull; Traffic Free</p>
+                </div>
+            </div>
+
+            <!-- Big Telemetry Gauges -->
+            <div class="driver-telemetry-grid">
+                <div class="telemetry-tile">
+                    <div class="label">Current Speed</div>
+                    <div class="val" id="cabSpeedVal">58 <span style="font-size: 1rem; color:var(--text-muted);">km/h</span></div>
+                </div>
+                <div class="telemetry-tile">
+                    <div class="label">Estimated Arrival (ETA)</div>
+                    <div class="val" id="cabEtaVal" style="color: #10b981;">6 <span style="font-size: 1rem; color:var(--text-muted);">mins</span></div>
+                </div>
+                <div class="telemetry-tile">
+                    <div class="label">Distance to Hospital</div>
+                    <div class="val" id="cabDistVal">10.7 <span style="font-size: 1rem; color:var(--text-muted);">km</span></div>
+                </div>
+            </div>
+
+            <!-- Driver Decision Prompt (Shows when entering Forest Area) -->
+            <div class="driver-decision-panel" id="cabDecisionPanel">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i data-lucide="trees" style="width: 28px; height: 28px; color: #ef4444;"></i>
+                    <div>
+                        <h4 style="font-size: 1.15rem; color: white;">FOREST REGION ENTRY AHEAD</h4>
+                        <p style="font-size: 0.85rem; color: #fca5a5;">
+                            Zero cellular signal zone with wildlife hazard. An alternate 4-lane highway bypass is available.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="decision-actions">
+                    <button class="btn-big-choice btn-bypass" onclick="driverChooseRoute(true)">
+                        <i data-lucide="shield-check" style="width: 18px; height: 18px; display:inline; vertical-align:middle; margin-right:6px;"></i>
+                        Take Safe Highway Bypass
+                    </button>
+                    <button class="btn-big-choice btn-continue" onclick="driverChooseRoute(false)">
+                        <i data-lucide="arrow-right" style="width: 18px; height: 18px; display:inline; vertical-align:middle; margin-right:6px;"></i>
+                        Continue Through Forest
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; text-align: center;">
+                <button class="btn-demo" onclick="switchRole('operator')" style="display: inline-flex; padding: 0.6rem 1.25rem;">
+                    <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i>
+                    Return to Operator CAD Map
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- MODAL 1: DRIVER PROFILE LOGIN -->
+    <div class="modal-backdrop" id="modalDriverLogin">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>Ambulance Driver Login Profile</h3>
+                <button class="modal-close-btn" onclick="closeModal('modalDriverLogin')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                    Select or enter your driver credentials. Logging in automatically notifies the Central CAD Operator.
+                </p>
+
+                <!-- Quick Profile Selectors -->
+                <div class="profile-quick-picks">
+                    <div class="quick-pick-card selected" onclick="selectQuickProfile('Rajesh Kumar', 'DRV-842', 'AMB-101', this)">
+                        <strong style="color:white; font-size:0.85rem;">Rajesh Kumar</strong>
+                        <div style="font-size:0.75rem; color:#38bdf8;">AMB-101 (Duty)</div>
+                    </div>
+                    <div class="quick-pick-card" onclick="selectQuickProfile('Priya Sharma', 'DRV-519', 'AMB-104', this)">
+                        <strong style="color:white; font-size:0.85rem;">Priya Sharma</strong>
+                        <div style="font-size:0.75rem; color:#10b981;">AMB-104</div>
+                    </div>
+                    <div class="quick-pick-card" onclick="selectQuickProfile('Vikram Singh', 'DRV-303', 'AMB-202', this)">
+                        <strong style="color:white; font-size:0.85rem;">Vikram Singh</strong>
+                        <div style="font-size:0.75rem; color:#10b981;">AMB-202</div>
+                    </div>
+                </div>
+
+                <form onsubmit="handleDriverLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">Driver Full Name</label>
+                        <input type="text" id="loginDriverName" class="form-input" value="Rajesh Kumar" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Driver ID / Badge Number</label>
+                        <input type="text" id="loginDriverId" class="form-input" value="DRV-842" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Assigned Ambulance ID</label>
+                        <select id="loginAmbulanceId" class="form-select">
+                            <option value="AMB-101" selected>AMB-101 (Advanced Cardiac ICU)</option>
+                            <option value="AMB-104">AMB-104 (Basic Life Support)</option>
+                            <option value="AMB-202">AMB-202 (Trauma Response Unit)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary" style="margin-top: 0.5rem;">
+                        Authenticate &amp; Notify Control Operator
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: GRAPH DATA STRUCTURE & ADJACENCY LIST INSPECTOR -->
+    <div class="modal-backdrop" id="modalGraphInspector">
+        <div class="modal-window large">
+            <div class="modal-header">
+                <h3>Dynamic Weighted Directed Graph: Adjacency List &amp; Weights</h3>
+                <button class="modal-close-btn" onclick="closeModal('modalGraphInspector')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 0.85rem; font-size: 0.85rem; color: var(--text-secondary);">
+                    <strong>Data Structure Concepts:</strong> Intersections = Vertices ($V$), Roads = Directed Edges ($E$).
+                    Weights dynamically calculated: $\text{Weight} = \text{Distance} \times \text{TrafficMultiplier} + \text{ForestPenalty}$.
+                </div>
+                <div class="code-container" id="graphAdjacencyListContent">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: PURE C SOURCE CODE INSPECTOR -->
+    <div class="modal-backdrop" id="modalCodeInspector">
+        <div class="modal-window large">
+            <div class="modal-header">
+                <h3>C Program Implementation (smartroute.c)</h3>
+                <button class="modal-close-btn" onclick="closeModal('modalCodeInspector')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                    <span style="font-size:0.85rem; color:var(--text-secondary);">
+                        Standard C99 Code &bull; Min-Heap Priority Queue &bull; Complexity: $O((V + E) \log V)$
+                    </span>
+                    <button class="btn-demo" onclick="copyCCode()">Copy Code</button>
+                </div>
+                <div class="code-container" id="cCodeDisplay">
+                    <!-- Loaded dynamically from smartroute.c -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+/**
+ * SmartRoute: Graph Data Structures & Algorithms
+ * Implemented:
+ * - Dynamic Weighted Directed Graph (Adjacency List)
+ * - Min-Heap Priority Queue
+ * - Dijkstra's Shortest Path with Dynamic Weights: O((V + E) log V)
+ * - Forest Geofencing (Ray Casting & Buffer Proximity)
+ * - 15-Second GPS Watchdog Timer
+ */
+
+class MinHeap {
+    constructor() {
+        this.heap = [];
+        this.pos = new Map(); // O(1) node position lookup for decreaseKey
+    }
+
+    size() {
+        return this.heap.length;
+    }
+
+    isEmpty() {
+        return this.heap.length === 0;
+    }
+
+    swap(i, j) {
+        const temp = this.heap[i];
+        this.heap[i] = this.heap[j];
+        this.heap[j] = temp;
+        this.pos.set(this.heap[i].vertex, i);
+        this.pos.set(this.heap[j].vertex, j);
+    }
+
+    insert(vertex, dist) {
+        const node = { vertex, dist };
+        this.heap.push(node);
+        const idx = this.heap.length - 1;
+        this.pos.set(vertex, idx);
+        this.bubbleUp(idx);
+    }
+
+    bubbleUp(idx) {
+        while (idx > 0) {
+            const parentIdx = Math.floor((idx - 1) / 2);
+            if (this.heap[idx].dist < this.heap[parentIdx].dist) {
+                this.swap(idx, parentIdx);
+                idx = parentIdx;
+            } else {
+                break;
+            }
+        }
+    }
+
+    extractMin() {
+        if (this.isEmpty()) return null;
+        const root = this.heap[0];
+        const last = this.heap.pop();
+        this.pos.delete(root.vertex);
+
+        if (this.heap.length > 0) {
+            this.heap[0] = last;
+            this.pos.set(last.vertex, 0);
+            this.sinkDown(0);
+        }
+        return root;
+    }
+
+    sinkDown(idx) {
+        const length = this.heap.length;
+        while (true) {
+            let smallest = idx;
+            const left = 2 * idx + 1;
+            const right = 2 * idx + 2;
+
+            if (left < length && this.heap[left].dist < this.heap[smallest].dist) {
+                smallest = left;
+            }
+            if (right < length && this.heap[right].dist < this.heap[smallest].dist) {
+                smallest = right;
+            }
+            if (smallest !== idx) {
+                this.swap(idx, smallest);
+                idx = smallest;
+            } else {
+                break;
+            }
+        }
+    }
+
+    decreaseKey(vertex, newDist) {
+        if (!this.pos.has(vertex)) return;
+        let idx = this.pos.get(vertex);
+        if (newDist < this.heap[idx].dist) {
+            this.heap[idx].dist = newDist;
+            this.bubbleUp(idx);
+        }
+    }
+
+    contains(vertex) {
+        return this.pos.has(vertex);
+    }
+}
+
+class Graph {
+    constructor() {
+        this.vertices = new Map(); // id -> { id, name, lat, lng, inForest, nearForest }
+        this.adjList = new Map();  // id -> Array<{ dest, distKm, trafficFactor, isForest, roadName }>
+        this.edges = [];           // Array of all edge objects for map rendering
+    }
+
+    addVertex(id, name, lat, lng, inForest = false, nearForest = false) {
+        this.vertices.set(id, { id, name, lat, lng, inForest, nearForest });
+        if (!this.adjList.has(id)) {
+            this.adjList.set(id, []);
+        }
+    }
+
+    addEdge(src, dest, distKm, trafficFactor = 1.0, isForest = false, roadName = "Road") {
+        const edge = {
+            id: `${src}-${dest}`,
+            src,
+            dest,
+            distKm,
+            trafficFactor,
+            isForest,
+            roadName
+        };
+
+        this.adjList.get(src).push(edge);
+        this.edges.push(edge);
+
+        // Also add bidirectional edge for 2-way roads
+        const revEdge = {
+            id: `${dest}-${src}`,
+            src: dest,
+            dest: src,
+            distKm,
+            trafficFactor,
+            isForest,
+            roadName
+        };
+        if (!this.adjList.has(dest)) this.adjList.set(dest, []);
+        this.adjList.get(dest).push(revEdge);
+    }
+
+    setTraffic(src, dest, trafficFactor) {
+        const update = (from, to) => {
+            const edges = this.adjList.get(from) || [];
+            const edge = edges.find(e => e.dest === to);
+            if (edge) edge.trafficFactor = trafficFactor;
+        };
+        update(src, dest);
+        update(dest, src);
+
+        const edgeInList = this.edges.find(e => (e.src === src && e.dest === dest) || (e.src === dest && e.dest === src));
+        if (edgeInList) edgeInList.trafficFactor = trafficFactor;
+    }
+
+    /**
+     * Dijkstra's Shortest Path Algorithm using Min-Heap
+     * Dynamic Weight = distKm * trafficFactor + (avoidForest && isForest ? 12.0 : 0)
+     */
+    dijkstra(src, dest, avoidForest = false) {
+        const distances = new Map();
+        const actualKm = new Map();
+        const parent = new Map();
+        const minHeap = new MinHeap();
+        const visitedOrder = [];
+
+        this.vertices.forEach((v, id) => {
+            distances.set(id, Infinity);
+            actualKm.set(id, 0);
+            parent.set(id, null);
+        });
+
+        distances.set(src, 0);
+        minHeap.insert(src, 0);
+
+        while (!minHeap.isEmpty()) {
+            const minNode = minHeap.extractMin();
+            const u = minNode.vertex;
+            visitedOrder.push(u);
+
+            if (u === dest) break; // Found shortest path to destination
+
+            const neighbors = this.adjList.get(u) || [];
+            for (const edge of neighbors) {
+                const v = edge.dest;
+                let weight = edge.distKm * edge.trafficFactor;
+
+                // If user/driver requested forest bypass, penalize forest edges heavily
+                if (avoidForest && edge.isForest) {
+                    weight += 15.0; // Dynamic detour penalty
+                }
+
+                const newDist = distances.get(u) + weight;
+                if (newDist < distances.get(v)) {
+                    distances.set(v, newDist);
+                    actualKm.set(v, actualKm.get(u) + edge.distKm);
+                    parent.set(v, u);
+
+                    if (minHeap.contains(v)) {
+                        minHeap.decreaseKey(v, newDist);
+                    } else {
+                        minHeap.insert(v, newDist);
+                    }
+                }
+            }
+        }
+
+        // Reconstruct path
+        const path = [];
+        let curr = dest;
+        while (curr !== null) {
+            path.unshift(curr);
+            curr = parent.get(curr);
+        }
+
+        // Check if path is valid
+        const isReachable = path.length > 0 && path[0] === src;
+        const totalDistanceKm = isReachable ? actualKm.get(dest) : 0;
+        // Estimated Time: 50 km/h emergency speed base, scaled by traffic weight
+        const totalTimeMins = isReachable ? Math.round((distances.get(dest) / 45.0) * 60) : 0;
+
+        return {
+            path: isReachable ? path : [],
+            distanceKm: Number(totalDistanceKm.toFixed(2)),
+            etaMinutes: Math.max(1, totalTimeMins),
+            cost: distances.get(dest),
+            visitedOrder
+        };
+    }
+}
+
+/**
+ * Forest Geofence Detection Engine
+ * Uses Point-in-Polygon (Ray Casting) and Proximity Radius
+ */
+class ForestGeofence {
+    constructor(polygonCoords, name = "Protected Reserve Forest") {
+        this.polygon = polygonCoords; // Array of [lat, lng]
+        this.name = name;
+        this.approachBufferKm = 0.6; // 600m warning buffer
+    }
+
+    // Ray-casting algorithm for point-in-polygon
+    contains(lat, lng) {
+        let inside = false;
+        const n = this.polygon.length;
+        for (let i = 0, j = n - 1; i < n; j = i++) {
+            const xi = this.polygon[i][0], yi = this.polygon[i][1];
+            const xj = this.polygon[j][0], yj = this.polygon[j][1];
+
+            const intersect = ((yi > lng) !== (yj > lng)) &&
+                (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    // Haversine distance in km between two lat/lng
+    static distanceKm(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Earth radius in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    // Check if within approach buffer
+    isApproaching(lat, lng) {
+        if (this.contains(lat, lng)) return false; // Already inside
+
+        for (const [pLat, pLng] of this.polygon) {
+            const d = ForestGeofence.distanceKm(lat, lng, pLat, pLng);
+            if (d <= this.approachBufferKm) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+/**
+ * 15-Second GPS Connection Watchdog
+ */
+class GPSWatchdog {
+    constructor(timeoutSeconds = 15, onStatusChange = null) {
+        this.timeoutSeconds = timeoutSeconds;
+        this.onStatusChange = onStatusChange;
+        this.lastPingTime = Date.now();
+        this.isConnected = true;
+        this.isSimulatedLoss = false;
+        this.lossReason = "NONE"; // "SIGNAL_LOSS" | "NETWORK_OFFLINE"
+        this.timer = null;
+        this.start();
+    }
+
+    start() {
+        if (this.timer) clearInterval(this.timer);
+        this.timer = setInterval(() => this.check(), 1000);
+    }
+
+    ping() {
+        if (this.isSimulatedLoss) return; // Block pings during simulated outage
+        this.lastPingTime = Date.now();
+        if (!this.isConnected) {
+            this.isConnected = true;
+            this.lossReason = "NONE";
+            if (this.onStatusChange) {
+                this.onStatusChange(true, 0, "RESTORED");
+            }
+        }
+    }
+
+    check() {
+        const elapsedSec = (Date.now() - this.lastPingTime) / 1000;
+        if (elapsedSec >= this.timeoutSeconds && this.isConnected) {
+            this.isConnected = false;
+            this.lossReason = "GPS_SIGNAL_TIMEOUT";
+            if (this.onStatusChange) {
+                this.onStatusChange(false, Math.floor(elapsedSec), this.lossReason);
+            }
+        }
+    }
+
+    simulateLoss(reason = "GPS_SATELLITE_BLOCKED") {
+        this.isSimulatedLoss = true;
+        this.isConnected = false;
+        this.lossReason = reason;
+        this.lastPingTime = Date.now() - (this.timeoutSeconds * 1000) - 2000; // Force > 15s
+        if (this.onStatusChange) {
+            this.onStatusChange(false, 17, reason);
+        }
+    }
+
+    restore() {
+        this.isSimulatedLoss = false;
+        this.lastPingTime = Date.now();
+        this.isConnected = true;
+        this.lossReason = "NONE";
+        if (this.onStatusChange) {
+            this.onStatusChange(true, 0, "RESTORED");
+        }
+    }
+
+    getElapsedSeconds() {
+        return Math.floor((Date.now() - this.lastPingTime) / 1000);
+    }
+}
+
+/**
+ * Dynamic Road Network Generator anchored around ANY Live Location!
+ * This enables the app to center around the user's current city/area coordinates!
+ */
+function createCityGraphAt(centerLat, centerLng) {
+    const g = new Graph();
+
+    // Offsets in degrees (~1 deg lat = 111 km, 0.01 deg ~= 1.1 km)
+    const dLat = 0.009;
+    const dLng = 0.012;
+
+    // Define 8 vertices around user location
+    // Node 0: Current User / Emergency Scene (Origin)
+    g.addVertex(0, "Emergency Scene (Live Location)", centerLat, centerLng, false, false);
+
+    // Node 1: North Junction
+    g.addVertex(1, "North Boulevard Junction", centerLat + dLat * 0.8, centerLng + dLng * 0.4, false, false);
+
+    // Node 2: Forest Approach Gateway
+    g.addVertex(2, "Forest Approach Point", centerLat + dLat * 1.6, centerLng + dLng * 0.8, false, true);
+
+    // Node 3: Forest South Gate (Inside Forest)
+    g.addVertex(3, "Eco Reserve South Gate", centerLat + dLat * 2.3, centerLng + dLng * 1.2, true, false);
+
+    // Node 4: Forest North Crossing (Inside Forest)
+    g.addVertex(4, "Deep Forest Canopy Crossing", centerLat + dLat * 3.1, centerLng + dLng * 1.5, true, false);
+
+    // Node 5: West Expressway Cross (Highway Bypass route)
+    g.addVertex(5, "West Highway Interchange", centerLat + dLat * 1.0, centerLng - dLng * 0.9, false, false);
+
+    // Node 6: Outer Bypass Flyover
+    g.addVertex(6, "Express Ring Road (ORR)", centerLat + dLat * 2.7, centerLng - dLng * 0.5, false, false);
+
+    // Node 7: Metro Super-Speciality Trauma Center (Destination)
+    g.addVertex(7, "Apollo Trauma & Emergency Center", centerLat + dLat * 3.8, centerLng + dLng * 0.7, false, false);
+
+    // Define Edges
+    // Route 1 (Forest Path): 0 -> 1 -> 2 -> 3 -> 4 -> 7
+    g.addEdge(0, 1, 2.4, 1.0, false, "Boulevard Link");
+    g.addEdge(1, 2, 2.1, 1.1, false, "Ridge Road");
+    g.addEdge(2, 3, 2.2, 1.0, true,  "Forest Entry Cutoff");
+    g.addEdge(3, 4, 2.8, 1.0, true,  "Eco Canopy Track");
+    g.addEdge(4, 7, 2.6, 1.2, false, "Hospital Link Road");
+
+    // Route 2 (Express Highway Bypass): 0 -> 5 -> 6 -> 7
+    g.addEdge(0, 5, 3.2, 1.1, false, "City West Radial");
+    g.addEdge(5, 6, 4.8, 1.0, false, "Outer Ring Expressway");
+    g.addEdge(6, 7, 3.5, 1.0, false, "Trauma Center North Flyover");
+
+    // Connector between North Junction and Bypass
+    g.addEdge(1, 5, 2.9, 1.3, false, "Radial Link 2");
+
+    // Define Forest Polygon Boundaries surrounding Nodes 3 & 4
+    const forestPolygon = [
+        [centerLat + dLat * 1.8, centerLng + dLng * 0.5],
+        [centerLat + dLat * 3.6, centerLng + dLng * 0.8],
+        [centerLat + dLat * 3.5, centerLng + dLng * 2.2],
+        [centerLat + dLat * 2.0, centerLng + dLng * 2.0],
+        [centerLat + dLat * 1.8, centerLng + dLng * 0.5]
+    ];
+
+    const forestGeofence = new ForestGeofence(forestPolygon, "Green Reserve Bio-Corridor");
+
+    return { graph: g, forestGeofence, forestPolygon };
+}
+
+</script>
+    <script>
+/**
+ * SmartRoute: Main Application Controller
+ * Handles Leaflet Map, Real-Time GPS Tracking, Forest Warning System,
+ * 15-Second GPS Watchdog, Dynamic Dijkstra Recalculation, Driver Login Profile,
+ * and Live User Geolocation Integration.
+ */
+
+// ============================================================================
+// SYSTEM STATE & CONFIGURATION
+// ============================================================================
+const STATE = {
+    currentRole: 'operator', // 'operator' | 'driver'
+    driver: {
+        name: 'Rajesh Kumar',
+        id: 'DRV-842',
+        ambulanceId: 'AMB-101',
+        isLoggedIn: true
+    },
+    trackingActive: false,
+    currentCoords: [17.3850, 78.4867], // Default city origin (Hyderabad/Metro)
+    userLocationCenter: [17.3850, 78.4867],
+    graphData: null, // { graph, forestGeofence, forestPolygon }
+    activeRouteInfo: null, // Result of Dijkstra
+    alternativeRouteInfo: null,
+    currentPathIndex: 0,
+    progressAlongEdge: 0, // 0.0 to 1.0
+    currentSpeedKmh: 58,
+    isForestWarningTriggered: false,
+    isForestEntryTriggered: false,
+    avoidForestChoice: false,
+    lastKnownPosition: null,
+    uncertaintyCircle: null,
+    audioEnabled: true
+};
+
+// Map & Layer References
+let map = null;
+let ambulanceMarker = null;
+let hospitalMarker = null;
+let forestPolygonLayer = null;
+let roadLayers = [];
+let activeRoutePolyline = null;
+let alternativeRoutePolyline = null;
+let nodeMarkers = [];
+let simulationInterval = null;
+let watchdog = null;
+
+// ============================================================================
+// AUDIO ALERT SYNTHESIZER (Web Audio API)
+// ============================================================================
+function playAlertTone(type = 'info') {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === 'critical') {
+            // High double pulse
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.setValueAtTime(660, ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+        } else if (type === 'warning') {
+            // Amber chime
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+            osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+        } else {
+            // Pleasant notification blip
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.2);
+        }
+    } catch (e) {
+        // Audio auto-play might be restricted before first click
+    }
+}
+
+// ============================================================================
+// INITIALIZATION & LIVE LOCATION ENGINE
+// ============================================================================
+let userLiveFixCircle = null;
+let userLiveFixMarker = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    initWatchdog();
+    initGraphAndMap(STATE.userLocationCenter[0], STATE.userLocationCenter[1]);
+    initCodeInspectorContent();
+    setupKeyboardShortcuts();
+
+    // Push initial login alert
+    logAlert("Driver Rajesh Kumar (AMB-101) logged in. Unit is ON DUTY.", "success");
+    logAlert("Dijkstra Min-Heap engine initialized. Road network loaded.", "info");
+
+    // Automatically locate user's real area on startup
+    tryAutoGeolocate();
+});
+
+function setupKeyboardShortcuts() {
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'f' || e.key === 'F') {
+            // Ignore if typing in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            toggleMapMaximize();
+        } else if (e.key === 'Escape') {
+            const wrapper = document.getElementById('mainMapWrapper');
+            if (wrapper && wrapper.classList.contains('maximized')) {
+                toggleMapMaximize();
+            }
+        }
+    });
+}
+
+function tryAutoGeolocate() {
+    const badge = document.getElementById('hudAreaBadge');
+    if (badge) badge.textContent = "Detecting Live Location...";
+
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const accuracy = pos.coords.accuracy || 50;
+
+                updateLocationAndRebuildGraph(lat, lng, "Live Location");
+                reverseGeocodeArea(lat, lng);
+                logAlert(`ðŸ“ GPS Lock acquired: ${lat.toFixed(4)}, ${lng.toFixed(4)} (Accuracy: ${Math.round(accuracy)}m). Map centered on your current location.`, "success");
+                playAlertTone('info');
+            },
+            (err) => {
+                console.warn("Browser GPS prompt skipped or denied, attempting IP city fallback...", err.message);
+                fallbackIpLocation();
+            },
+            { timeout: 8000, enableHighAccuracy: true, maximumAge: 0 }
+        );
+    } else {
+        fallbackIpLocation();
+    }
+}
+
+function fallbackIpLocation() {
+    // Free IP geolocation fallback (No API key needed)
+    fetch('https://get.geojs.io/v1/ip/geo.json')
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.latitude && data.longitude) {
+                const lat = parseFloat(data.latitude);
+                const lng = parseFloat(data.longitude);
+                const city = data.city || data.region || "Your Metro Area";
+                updateLocationAndRebuildGraph(lat, lng, city);
+                const badge = document.getElementById('hudAreaBadge');
+                if (badge) badge.textContent = `ðŸ“ ${city}`;
+                const originLabel = document.getElementById('routeOriginName');
+                if (originLabel) originLabel.textContent = `${city} (Origin)`;
+                logAlert(`ðŸ“ Area located via IP telemetry: ${city} (${lat.toFixed(4)}, ${lng.toFixed(4)}). Graph centered on your city.`, "info");
+            }
+        })
+        .catch(() => {
+            const badge = document.getElementById('hudAreaBadge');
+            if (badge) badge.textContent = "ðŸ“ Metro Center";
+        });
+}
+
+function fetchUserLiveLocation() {
+    if (!("geolocation" in navigator)) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+    }
+    const btn = document.getElementById('btnUseLiveLocation');
+    const oldText = btn.innerHTML;
+    btn.innerHTML = `<span class="pulse-dot" style="display:inline-block;"></span> Locating...`;
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            btn.innerHTML = oldText;
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            updateLocationAndRebuildGraph(lat, lng, "Live Area Location");
+            reverseGeocodeArea(lat, lng);
+            logAlert(`Map and Directed Graph re-anchored to your live coordinates: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, "success");
+            playAlertTone('info');
+        },
+        (err) => {
+            btn.innerHTML = oldText;
+            alert("Could not retrieve exact GPS fix (" + err.message + "). Check browser location permissions.");
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+}
+
+function reverseGeocodeArea(lat, lng) {
+    const badge = document.getElementById('hudAreaBadge');
+    const originLabel = document.getElementById('routeOriginName');
+
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`)
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.address) {
+                const area = data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.city || data.address.town || data.address.county || "Live Area";
+                const city = data.address.city || data.address.state_district || "";
+                const displayStr = city ? `${area}, ${city}` : area;
+
+                if (badge) badge.textContent = `ðŸ“ ${displayStr}`;
+                if (originLabel) originLabel.textContent = `${displayStr} (Emergency Scene)`;
+                logAlert(`Area identified: ${displayStr}`, "info");
+            }
+        })
+        .catch(() => {
+            if (badge) badge.textContent = `ðŸ“ ${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+        });
+}
+
+function updateLocationAndRebuildGraph(centerLat, centerLng, label = "Origin") {
+    STATE.userLocationCenter = [centerLat, centerLng];
+    STATE.currentCoords = [centerLat, centerLng];
+    STATE.lastKnownPosition = [centerLat, centerLng];
+
+    // Rebuild dynamic graph anchored at this location
+    STATE.graphData = createCityGraphAt(centerLat, centerLng);
+
+    // Reposition map
+    if (map) {
+        map.flyTo([centerLat + 0.015, centerLng + 0.005], 13.5, { duration: 1.2 });
+        renderGraphOnMap();
+        computeAndRenderDijkstra();
+    }
+}
+
+// ============================================================================
+// MOVEABLE MAP CONTROLS (MAXIMIZE / FULLSCREEN, MINIMIZE, RECENTER)
+// ============================================================================
+function toggleMapMaximize() {
+    const wrapper = document.getElementById('mainMapWrapper');
+    if (!wrapper) return;
+
+    wrapper.classList.toggle('maximized');
+    wrapper.classList.remove('minimized');
+    const isMax = wrapper.classList.contains('maximized');
+
+    const icon = document.getElementById('iconMaximize');
+    if (icon) {
+        icon.setAttribute('data-lucide', isMax ? 'minimize-2' : 'maximize-2');
+        if (window.lucide) lucide.createIcons();
+    }
+
+    const btn = document.getElementById('btnToggleMaximize');
+    if (btn) {
+        btn.setAttribute('title', isMax ? 'Restore Default View (F / Esc)' : 'Maximize / Fullscreen Map (F)');
+    }
+
+    // Force Leaflet to re-calculate container dimensions across full window
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize({ pan: false, debounceMoveEvents: true });
+        }
+    }, 200);
+
+    logAlert(isMax ? "Map expanded to Fullscreen CAD Mode (Press F or Esc to restore)." : "Map restored to standard dashboard view.", "info");
+}
+
+function toggleMapMinimize() {
+    const wrapper = document.getElementById('mainMapWrapper');
+    if (!wrapper) return;
+
+    wrapper.classList.toggle('minimized');
+    wrapper.classList.remove('maximized');
+
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize({ pan: false });
+        }
+    }, 200);
+}
+
+function recenterToLiveLocation() {
+    if (!map || !STATE.userLocationCenter) return;
+    map.flyTo(STATE.userLocationCenter, 14, { duration: 1.0 });
+    logAlert("Map re-centered to your live location.", "info");
+}
+
+// ============================================================================
+// WATCHDOG TIMER SETUP (15-Second Connection Loss Detection)
+// ============================================================================
+function initWatchdog() {
+    watchdog = new GPSWatchdog(15, (isConnected, elapsedSeconds, reason) => {
+        const pill = document.getElementById('headerGpsPill');
+        const text = document.getElementById('headerGpsText');
+        const cabPill = document.getElementById('cabGpsPill');
+        const cabText = document.getElementById('cabGpsText');
+        const kpiVal = document.getElementById('kpiGpsStatus');
+        const kpiSub = document.getElementById('kpiGpsSub');
+        const banner = document.getElementById('bannerGpsLost');
+        const tblGps = document.getElementById('tblGps101');
+
+        if (!isConnected) {
+            // LOST STATE
+            pill.classList.add('lost');
+            text.textContent = 'GPS: LOST (15s+)';
+            if (cabPill) {
+                cabPill.classList.add('lost');
+                cabText.textContent = 'GPS SIGNAL LOST';
+            }
+            kpiVal.textContent = 'LOST';
+            kpiVal.style.color = 'var(--emergency-red)';
+            kpiSub.textContent = `No ping for ${elapsedSeconds}s (Threshold: 15s)`;
+            banner.classList.add('visible');
+
+            const details = document.getElementById('bannerGpsLostDetails');
+            const latLngStr = STATE.currentCoords ? `${STATE.currentCoords[0].toFixed(5)}, ${STATE.currentCoords[1].toFixed(5)}` : "Unknown";
+            details.textContent = `Vehicle: ${STATE.driver.ambulanceId} | Driver: ${STATE.driver.name} | Last Ping: ${elapsedSeconds}s ago | Last Known: [${latLngStr}]`;
+
+            if (tblGps) {
+                tblGps.innerHTML = `<span style="color:#ef4444; font-weight:700;">&bull; LOST (${elapsedSeconds}s)</span>`;
+            }
+
+            // Draw uncertainty circle on map around last known coordinates
+            showUncertaintyCircle();
+
+            logAlert(`CRITICAL: GPS Connection Lost for ${STATE.driver.ambulanceId}! Telemetry stopped. Last known: ${latLngStr}`, 'critical');
+            playAlertTone('critical');
+        } else {
+            // CONNECTED STATE
+            pill.classList.remove('lost');
+            text.textContent = 'GPS: CONNECTED';
+            if (cabPill) {
+                cabPill.classList.remove('lost');
+                cabText.textContent = 'GPS ACTIVE';
+            }
+            kpiVal.textContent = 'CONNECTED';
+            kpiVal.style.color = 'var(--status-green)';
+            kpiSub.textContent = 'Ping delay: 1.0s (15s threshold)';
+            banner.classList.remove('visible');
+
+            if (tblGps) {
+                tblGps.innerHTML = `<span style="color:#10b981;">&bull; Active</span>`;
+            }
+
+            removeUncertaintyCircle();
+
+            if (reason === "RESTORED") {
+                logAlert(`GPS Connection Restored for ${STATE.driver.ambulanceId}. Telemetry synchronized.`, 'success');
+                playAlertTone('info');
+            }
+        }
+    });
+
+    // Update GPS ping timer display every second
+    setInterval(() => {
+        if (watchdog && watchdog.isConnected) {
+            const sub = document.getElementById('kpiGpsSub');
+            if (sub) {
+                const el = watchdog.getElapsedSeconds();
+                sub.textContent = `Ping delay: ${el.toFixed(1)}s (15s threshold)`;
+            }
+        }
+    }, 1000);
+}
+
+function showUncertaintyCircle() {
+    if (!map || !STATE.currentCoords) return;
+    removeUncertaintyCircle();
+
+    // 400m radius of dead-reckoning uncertainty
+    STATE.uncertaintyCircle = L.circle(STATE.currentCoords, {
+        radius: 400,
+        color: '#ef4444',
+        weight: 2,
+        dashArray: '6, 6',
+        fillColor: '#ef4444',
+        fillOpacity: 0.15
+    }).addTo(map);
+
+    // Change ambulance icon to semi-transparent ghost marker
+    if (ambulanceMarker) {
+        ambulanceMarker.setOpacity(0.5);
+    }
+}
+
+function removeUncertaintyCircle() {
+    if (STATE.uncertaintyCircle && map) {
+        map.removeLayer(STATE.uncertaintyCircle);
+        STATE.uncertaintyCircle = null;
+    }
+    if (ambulanceMarker) {
+        ambulanceMarker.setOpacity(1.0);
+    }
+}
+
+// ============================================================================
+// MAP & GRAPH RENDERING
+// ============================================================================
+function initGraphAndMap(centerLat, centerLng) {
+    // Generate Graph Data
+    STATE.graphData = createCityGraphAt(centerLat, centerLng);
+
+    // Initialize Leaflet Map with Dark Matter tiles
+    map = L.map('map', {
+        zoomControl: true,
+        attributionControl: false
+    }).setView([centerLat + 0.015, centerLng + 0.005], 13.5);
+
+    // CartoDB Dark Matter Tiles (Professional dark navy aesthetic)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd'
+    }).addTo(map);
+
+    renderGraphOnMap();
+    computeAndRenderDijkstra();
+}
+
+function renderGraphOnMap() {
+    const { graph, forestPolygon } = STATE.graphData;
+
+    // Clear previous layers
+    roadLayers.forEach(l => map.removeLayer(l));
+    roadLayers = [];
+    nodeMarkers.forEach(m => map.removeLayer(m));
+    nodeMarkers = [];
+
+    if (forestPolygonLayer) map.removeLayer(forestPolygonLayer);
+    if (ambulanceMarker) map.removeLayer(ambulanceMarker);
+    if (hospitalMarker) map.removeLayer(hospitalMarker);
+
+    // 1. Draw Forest Polygon
+    forestPolygonLayer = L.polygon(forestPolygon, {
+        color: '#059669',
+        weight: 2,
+        dashArray: '5, 5',
+        fillColor: '#059669',
+        fillOpacity: 0.25
+    }).addTo(map);
+
+    forestPolygonLayer.bindPopup(`<strong>${STATE.graphData.forestGeofence.name}</strong><br>Eco-Sensitive Geofenced Forest Corridor`);
+
+    // 2. Draw Road Edges (Color by traffic factor)
+    graph.edges.forEach(edge => {
+        const u = graph.vertices.get(edge.src);
+        const v = graph.vertices.get(edge.dest);
+        if (!u || !v) return;
+
+        let strokeColor = '#10b981'; // Green (1.0x)
+        if (edge.trafficFactor >= 3.0) {
+            strokeColor = '#ef4444'; // Red (Heavy)
+        } else if (edge.trafficFactor > 1.3) {
+            strokeColor = '#f59e0b'; // Amber (Moderate)
+        }
+
+        const line = L.polyline([[u.lat, u.lng], [v.lat, v.lng]], {
+            color: strokeColor,
+            weight: 4,
+            opacity: 0.75
+        }).addTo(map);
+
+        line.bindTooltip(`${edge.roadName}: ${edge.distKm} km (Traffic: ${edge.trafficFactor}x)`, { sticky: true });
+        roadLayers.push(line);
+    });
+
+    // 3. Draw Vertex Nodes
+    graph.vertices.forEach(vertex => {
+        const isHospital = vertex.id === 7;
+        const isStart = vertex.id === 0;
+
+        const nodeIcon = L.divIcon({
+            className: 'custom-node-icon',
+            html: `<div style="
+                background: ${isHospital ? '#ef4444' : (isStart ? '#38bdf8' : '#1e293b')};
+                border: 2px solid ${isHospital ? '#ffffff' : '#38bdf8'};
+                color: #ffffff;
+                width: 22px;
+                height: 22px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 11px;
+                font-weight: 800;
+                box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            ">${vertex.id}</div>`,
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
+        });
+
+        const marker = L.marker([vertex.lat, vertex.lng], { icon: nodeIcon }).addTo(map);
+        marker.bindPopup(`<strong>[Node ${vertex.id}] ${vertex.name}</strong><br>Lat: ${vertex.lat.toFixed(4)}, Lng: ${vertex.lng.toFixed(4)}`);
+        nodeMarkers.push(marker);
+    });
+
+    // 4. Hospital Marker at Destination (Node 7)
+    const hospitalVertex = graph.vertices.get(7);
+    const hospIcon = L.divIcon({
+        className: 'hospital-marker-icon',
+        html: `
+            <div style="background:#ef4444; color:white; width:34px; height:34px; border-radius:8px; border:2px solid white; display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(239,68,68,0.8); font-weight:bold; font-size:18px;">
+                +
+            </div>
+        `,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
+    });
+    hospitalMarker = L.marker([hospitalVertex.lat, hospitalVertex.lng], { icon: hospIcon }).addTo(map);
+    hospitalMarker.bindPopup(`<strong>${hospitalVertex.name}</strong><br>Level-1 Emergency Trauma Hospital`);
+
+    // 5. Ambulance Marker at Origin (Node 0)
+    const startVertex = graph.vertices.get(0);
+    const ambIcon = L.divIcon({
+        className: 'ambulance-marker-icon',
+        html: `
+            <div class="siren-beacon">
+                <div class="siren-ring"></div>
+                <div style="background:#0ea5e9; width:28px; height:28px; border-radius:50%; border:2px solid #ffffff; display:flex; align-items:center; justify-content:center; box-shadow:0 0 12px #0ea5e9;">
+                    <span style="font-size:14px;">ðŸš‘</span>
+                </div>
+            </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+    });
+    ambulanceMarker = L.marker([startVertex.lat, startVertex.lng], { icon: ambIcon, zIndexOffset: 1000 }).addTo(map);
+}
+
+// ============================================================================
+// DIJKSTRA ROUTE COMPUTATION & RENDERING
+// ============================================================================
+function computeAndRenderDijkstra(avoidForest = STATE.avoidForestChoice) {
+    const { graph } = STATE.graphData;
+    const result = graph.dijkstra(0, 7, avoidForest);
+    STATE.activeRouteInfo = result;
+
+    const coords = result.path.map(id => {
+        const v = graph.vertices.get(id);
+        return [v.lat, v.lng];
+    });
+
+    // Remove old polylines
+    if (activeRoutePolyline) map.removeLayer(activeRoutePolyline);
+    if (alternativeRoutePolyline) map.removeLayer(alternativeRoutePolyline);
+
+    // If avoiding forest, also compute the default forest path to show as gray dashed alternative
+    if (avoidForest) {
+        const defaultResult = graph.dijkstra(0, 7, false);
+        STATE.alternativeRouteInfo = defaultResult;
+        const defaultCoords = defaultResult.path.map(id => {
+            const v = graph.vertices.get(id);
+            return [v.lat, v.lng];
+        });
+
+        alternativeRoutePolyline = L.polyline(defaultCoords, {
+            color: '#64748b',
+            weight: 4,
+            dashArray: '6, 8',
+            opacity: 0.65
+        }).addTo(map);
+        alternativeRoutePolyline.bindTooltip("Original Forest Route (Bypassed)", { sticky: true });
+    }
+
+    // Active Route Polyline (Glowing cyan/blue)
+    activeRoutePolyline = L.polyline(coords, {
+        color: '#06b6d4',
+        weight: 6,
+        opacity: 0.95,
+        lineCap: 'round'
+    }).addTo(map);
+
+    // Update UI elements
+    updateRouteUI(result, avoidForest);
+}
+
+function updateRouteUI(result, avoidForest) {
+    const { graph } = STATE.graphData;
+    const pathStr = result.path.map(id => {
+        const v = graph.vertices.get(id);
+        return `${v.name.split(' ')[0]} (${id})`;
+    }).join(' &rarr; ');
+
+    document.getElementById('routeNodesText').innerHTML = pathStr;
+    document.getElementById('sideDist').textContent = `${result.distanceKm} km`;
+    document.getElementById('sideEta').textContent = `~${result.etaMinutes} mins`;
+    document.getElementById('hudDist').textContent = `${result.distanceKm} km`;
+    document.getElementById('hudEta').textContent = `${result.etaMinutes} mins`;
+    document.getElementById('cabDistVal').textContent = `${result.distanceKm} km`;
+    document.getElementById('cabEtaVal').textContent = `${result.etaMinutes} mins`;
+
+    const badge = document.getElementById('routeTagBadge');
+    const hudMode = document.getElementById('hudMode');
+    if (avoidForest) {
+        badge.textContent = 'Bypass Highway (Safe)';
+        badge.style.color = '#10b981';
+        hudMode.textContent = 'Highway Bypass';
+        hudMode.style.color = '#10b981';
+    } else {
+        badge.textContent = 'Standard Dijkstra';
+        badge.style.color = '#38bdf8';
+        hudMode.textContent = 'Optimal Direct';
+        hudMode.style.color = '#38bdf8';
+    }
+}
+
+// ============================================================================
+// REAL-TIME AMBULANCE GPS SIMULATION LOOP
+// ============================================================================
+function toggleAmbulanceTracking() {
+    STATE.trackingActive = !STATE.trackingActive;
+    const btn = document.getElementById('btnToggleTracking');
+    const text = document.getElementById('btnTrackingText');
+
+    if (STATE.trackingActive) {
+        btn.classList.remove('success');
+        btn.classList.add('danger');
+        text.textContent = 'Pause GPS Tracking';
+        startSimulationLoop();
+        logAlert("Ambulance live tracking started. Vehicle moving on active route.", "info");
+    } else {
+        btn.classList.remove('danger');
+        btn.classList.add('success');
+        text.textContent = 'Start GPS Tracking';
+        stopSimulationLoop();
+        logAlert("Ambulance tracking paused.", "info");
+    }
+}
+
+function startSimulationLoop() {
+    if (simulationInterval) clearInterval(simulationInterval);
+
+    simulationInterval = setInterval(() => {
+        if (!STATE.trackingActive) return;
+
+        // Ping watchdog to simulate live satellite heartbeat
+        if (watchdog) watchdog.ping();
+
+        stepAmbulanceAlongRoute();
+    }, 400); // 400ms tick for smooth movement
+}
+
+function stopSimulationLoop() {
+    if (simulationInterval) {
+        clearInterval(simulationInterval);
+        simulationInterval = null;
+    }
+}
+
+function stepAmbulanceAlongRoute() {
+    const { graph, forestGeofence } = STATE.graphData;
+    const path = STATE.activeRouteInfo.path;
+    if (!path || path.length < 2) return;
+
+    if (STATE.currentPathIndex >= path.length - 1) {
+        // Reached hospital destination!
+        logAlert("AMBULANCE ARRIVED AT APOLLO TRAUMA CENTER. Emergency handover in progress.", "success");
+        playAlertTone('warning');
+        toggleAmbulanceTracking();
+        return;
+    }
+
+    const uId = path[STATE.currentPathIndex];
+    const vId = path[STATE.currentPathIndex + 1];
+    const u = graph.vertices.get(uId);
+    const v = graph.vertices.get(vId);
+
+    // Advance progress along current edge
+    STATE.progressAlongEdge += 0.05; // 5% per tick
+
+    if (STATE.progressAlongEdge >= 1.0) {
+        STATE.progressAlongEdge = 0;
+        STATE.currentPathIndex++;
+    }
+
+    // Interpolate coordinates
+    const curLat = u.lat + (v.lat - u.lat) * STATE.progressAlongEdge;
+    const curLng = u.lng + (v.lng - u.lng) * STATE.progressAlongEdge;
+    STATE.currentCoords = [curLat, curLng];
+    STATE.lastKnownPosition = [curLat, curLng];
+
+    // Update Marker position on map
+    if (ambulanceMarker && map) {
+        ambulanceMarker.setLatLng([curLat, curLng]);
+    }
+
+    // Dynamic speed simulation
+    const speed = Math.floor(52 + Math.random() * 12);
+    STATE.currentSpeedKmh = speed;
+    document.getElementById('hudSpeed').textContent = `${speed} km/h`;
+    document.getElementById('cabSpeedVal').innerHTML = `${speed} <span style="font-size: 1rem; color:var(--text-muted);">km/h</span>`;
+
+    // Turn guidance update for Driver Cabin
+    updateTurnGuidance(u, v);
+
+    // Check Forest Geofence Condition
+    checkForestProximity(curLat, curLng, forestGeofence);
+}
+
+function updateTurnGuidance(currVertex, nextVertex) {
+    const title = document.getElementById('turnInstructionTitle');
+    const sub = document.getElementById('turnInstructionSub');
+    if (!title || !sub) return;
+
+    title.textContent = `Head toward ${nextVertex.name}`;
+    sub.textContent = `Leaving ${currVertex.name} &bull; Speed: ${STATE.currentSpeedKmh} km/h`;
+}
+
+// ============================================================================
+// FOREST WARNING & ENTRY SYSTEM
+// ============================================================================
+function checkForestProximity(lat, lng, forestGeofence) {
+    const isInside = forestGeofence.contains(lat, lng);
+    const isApproaching = forestGeofence.isApproaching(lat, lng);
+
+    const bannerApproach = document.getElementById('bannerForestApproach');
+    const bannerEntry = document.getElementById('bannerForestEntry');
+    const cabDecision = document.getElementById('cabDecisionPanel');
+    const kpiForest = document.getElementById('kpiForestStatus');
+    const kpiSub = document.getElementById('kpiForestSub');
+
+    if (isInside) {
+        // INSIDE FOREST
+        if (!STATE.isForestEntryTriggered) {
+            STATE.isForestEntryTriggered = true;
+            bannerApproach.classList.remove('visible');
+            bannerEntry.classList.add('visible');
+            cabDecision.classList.add('active');
+
+            kpiForest.textContent = 'INSIDE FOREST';
+            kpiForest.style.color = 'var(--emergency-red)';
+            kpiSub.textContent = 'Wildlife & cellular risk active';
+
+            // Flash forest polygon red
+            if (forestPolygonLayer) {
+                forestPolygonLayer.setStyle({
+                    color: '#ef4444',
+                    fillColor: '#ef4444',
+                    fillOpacity: 0.45
+                });
+            }
+
+            logAlert("RED ALERT: Ambulance entered Forest Area. Wildlife hazard & weak telemetry.", "critical");
+            playAlertTone('critical');
+        }
+    } else if (isApproaching) {
+        // APPROACHING FOREST (within 600m buffer)
+        if (!STATE.isForestWarningTriggered && !STATE.isForestEntryTriggered) {
+            STATE.isForestWarningTriggered = true;
+            bannerApproach.classList.add('visible');
+            kpiForest.textContent = 'APPROACHING';
+            kpiForest.style.color = 'var(--alert-amber)';
+            kpiSub.textContent = 'Within 600m of forest boundary';
+
+            logAlert("WARNING: You are approaching a Forest Area. Please review route before proceeding.", "warning");
+            playAlertTone('warning');
+        }
+    } else {
+        // CLEAR
+        if (STATE.isForestWarningTriggered && !STATE.isForestEntryTriggered) {
+            STATE.isForestWarningTriggered = false;
+            bannerApproach.classList.remove('visible');
+            kpiForest.textContent = 'CLEAR';
+            kpiForest.style.color = 'var(--status-green)';
+            kpiSub.textContent = 'Eco-reserve proximity';
+        }
+    }
+}
+
+function driverChooseRoute(avoidForest) {
+    STATE.avoidForestChoice = avoidForest;
+
+    // Dismiss banners
+    dismissBanner('bannerForestEntry');
+    dismissBanner('bannerForestApproach');
+    const cabDecision = document.getElementById('cabDecisionPanel');
+    if (cabDecision) cabDecision.classList.remove('active');
+
+    // Recalculate route using Dijkstra
+    computeAndRenderDijkstra(avoidForest);
+
+    if (avoidForest) {
+        logAlert(`DRIVER DECISION: Switched to Highway Bypass Route. Recalculated via Dijkstra.`, "success");
+        playAlertTone('info');
+    } else {
+        logAlert(`DRIVER DECISION: Continuing on current forest route under caution.`, "warning");
+    }
+}
+
+function dismissBanner(bannerId) {
+    const el = document.getElementById(bannerId);
+    if (el) el.classList.remove('visible');
+}
+
+// ============================================================================
+// GPS WATCHDOG SIMULATION TRIGGERS
+// ============================================================================
+function simulateGpsLoss() {
+    if (watchdog) {
+        watchdog.simulateLoss("GPS_SATELLITE_BLOCKED");
+    }
+}
+
+function restoreGpsConnection() {
+    if (watchdog) {
+        watchdog.restore();
+    }
+}
+
+// ============================================================================
+// TRAFFIC SIMULATION & RECALCULATION
+// ============================================================================
+function simulateTrafficJam() {
+    const { graph } = STATE.graphData;
+    // Inject heavy traffic on edge 0 <-> 1 (Boulevard Link)
+    graph.setTraffic(0, 1, 4.0); // 4x traffic multiplier
+
+    // Re-render roads on map
+    renderGraphOnMap();
+
+    // Recalculate route
+    computeAndRenderDijkstra(STATE.avoidForestChoice);
+
+    const kpiTraffic = document.getElementById('kpiTrafficStatus');
+    const kpiTrafficSub = document.getElementById('kpiTrafficSub');
+    kpiTraffic.textContent = 'CONGESTED';
+    kpiTraffic.style.color = 'var(--emergency-red)';
+    kpiTrafficSub.textContent = 'Boulevard Link: 4.0x congestion';
+
+    logAlert("TRAFFIC CONGESTION DETECTED: Boulevard Link traffic factor 4.0x. Dynamic Dijkstra recalculated optimal bypass.", "warning");
+    playAlertTone('warning');
+}
+
+function recalculateOptimalRoute() {
+    computeAndRenderDijkstra(STATE.avoidForestChoice);
+    logAlert("Dijkstra Min-Heap recalculated optimal route based on live dynamic weights.", "info");
+    playAlertTone('info');
+}
+
+function simulateApproachForest() {
+    const { graph } = STATE.graphData;
+    // Jump ambulance to vertex 2 (Forest Approach Point)
+    const v2 = graph.vertices.get(2);
+    STATE.currentPathIndex = 2;
+    STATE.progressAlongEdge = 0;
+    STATE.currentCoords = [v2.lat, v2.lng];
+    if (ambulanceMarker) ambulanceMarker.setLatLng([v2.lat, v2.lng]);
+    map.panTo([v2.lat, v2.lng]);
+
+    checkForestProximity(v2.lat, v2.lng, STATE.graphData.forestGeofence);
+}
+
+function simulateEnterForest() {
+    const { graph } = STATE.graphData;
+    // Jump ambulance to vertex 3 (Eco Reserve South Gate)
+    const v3 = graph.vertices.get(3);
+    STATE.currentPathIndex = 3;
+    STATE.progressAlongEdge = 0.2;
+    STATE.currentCoords = [v3.lat, v3.lng];
+    if (ambulanceMarker) ambulanceMarker.setLatLng([v3.lat, v3.lng]);
+    map.panTo([v3.lat, v3.lng]);
+
+    checkForestProximity(v3.lat, v3.lng, STATE.graphData.forestGeofence);
+}
+
+function resetDemo() {
+    stopSimulationLoop();
+    STATE.trackingActive = false;
+    STATE.currentPathIndex = 0;
+    STATE.progressAlongEdge = 0;
+    STATE.isForestWarningTriggered = false;
+    STATE.isForestEntryTriggered = false;
+    STATE.avoidForestChoice = false;
+
+    // Reset traffic on all edges
+    const { graph } = STATE.graphData;
+    graph.edges.forEach(e => e.trafficFactor = 1.0);
+
+    // Reset buttons
+    const btn = document.getElementById('btnToggleTracking');
+    btn.classList.remove('danger');
+    btn.classList.add('success');
+    document.getElementById('btnTrackingText').textContent = 'Start GPS Tracking';
+
+    dismissBanner('bannerForestApproach');
+    dismissBanner('bannerForestEntry');
+    dismissBanner('bannerGpsLost');
+
+    if (watchdog) watchdog.restore();
+
+    renderGraphOnMap();
+    computeAndRenderDijkstra(false);
+
+    document.getElementById('kpiTrafficStatus').textContent = 'OPTIMAL';
+    document.getElementById('kpiTrafficStatus').style.color = 'var(--status-green)';
+    document.getElementById('kpiTrafficSub').textContent = 'Dynamic edge weights';
+    document.getElementById('kpiForestStatus').textContent = 'CLEAR';
+    document.getElementById('kpiForestStatus').style.color = 'var(--status-green)';
+
+    logAlert("Simulation state reset to default parameters.", "info");
+}
+
+// ============================================================================
+// DRIVER PROFILE LOGIN SYSTEM
+// ============================================================================
+function openDriverLoginModal() {
+    const modal = document.getElementById('modalDriverLogin');
+    modal.classList.add('active');
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.classList.remove('active');
+}
+
+function selectQuickProfile(name, id, ambId, element) {
+    document.querySelectorAll('.quick-pick-card').forEach(c => c.classList.remove('selected'));
+    element.classList.add('selected');
+
+    document.getElementById('loginDriverName').value = name;
+    document.getElementById('loginDriverId').value = id;
+    document.getElementById('loginAmbulanceId').value = ambId;
+}
+
+function handleDriverLogin(event) {
+    event.preventDefault();
+    const name = document.getElementById('loginDriverName').value.trim();
+    const id = document.getElementById('loginDriverId').value.trim();
+    const ambId = document.getElementById('loginAmbulanceId').value;
+
+    STATE.driver.name = name;
+    STATE.driver.id = id;
+    STATE.driver.ambulanceId = ambId;
+    STATE.driver.isLoggedIn = true;
+
+    // Update UI headers & Driver Cabin
+    document.getElementById('headerDriverName').textContent = `Driver: ${name} (${ambId})`;
+    document.getElementById('cabDriverName').textContent = `Driver: ${name}`;
+    document.getElementById('cabAmbulanceId').textContent = ambId;
+
+    closeModal('modalDriverLogin');
+
+    // Operator notification
+    const msg = `ðŸ”” Driver ${name} (ID: ${id}) logged in to Ambulance ${ambId}. Vehicle is now ON DUTY.`;
+    logAlert(msg, "success");
+    playAlertTone('info');
+}
+
+// ============================================================================
+// ROLE SWITCHER: OPERATOR CONTROL vs DRIVER CABIN
+// ============================================================================
+function switchRole(role) {
+    STATE.currentRole = role;
+    const btnOp = document.getElementById('btnRoleOperator');
+    const btnDrv = document.getElementById('btnRoleDriver');
+    const opView = document.getElementById('operatorView');
+    const drvView = document.getElementById('driverCabinView');
+    const metricsGrid = document.getElementById('metricsGrid');
+
+    if (role === 'driver') {
+        btnOp.classList.remove('active');
+        btnDrv.classList.add('active');
+        opView.style.display = 'none';
+        metricsGrid.style.display = 'none';
+        drvView.classList.add('active');
+    } else {
+        btnDrv.classList.remove('active');
+        btnOp.classList.add('active');
+        drvView.classList.remove('active');
+        opView.style.display = 'grid';
+        metricsGrid.style.display = 'grid';
+        // Invalidate map size so Leaflet renders properly after tab switch
+        setTimeout(() => { if (map) map.invalidateSize(); }, 150);
+    }
+}
+
+// ============================================================================
+// ALERT LOGGING UTILITIES
+// ============================================================================
+function logAlert(message, type = 'info') {
+    const feed = document.getElementById('alertFeedContainer');
+    if (!feed) return;
+
+    const item = document.createElement('div');
+    item.className = `alert-item ${type}`;
+
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0];
+
+    item.innerHTML = `
+        <div>${message}</div>
+        <div class="alert-meta">
+            <span>${type.toUpperCase()}</span>
+            <span>${timeStr}</span>
+        </div>
+    `;
+
+    feed.insertBefore(item, feed.firstChild);
+
+    // Limit to 25 items
+    while (feed.children.length > 25) {
+        feed.removeChild(feed.lastChild);
+    }
+}
+
+function clearAlerts() {
+    const feed = document.getElementById('alertFeedContainer');
+    if (feed) feed.innerHTML = '';
+}
+
+function dispatchNewAmbulance() {
+    const randomId = `AMB-${Math.floor(200 + Math.random() * 200)}`;
+    logAlert(`New Emergency Unit ${randomId} dispatched to Sector 4 incident.`, "info");
+    playAlertTone('info');
+}
+
+// ============================================================================
+// CODE & GRAPH INSPECTORS
+// ============================================================================
+function openGraphInspector() {
+    const modal = document.getElementById('modalGraphInspector');
+    const container = document.getElementById('graphAdjacencyListContent');
+    const { graph } = STATE.graphData;
+
+    let output = "================================================================================\n";
+    output += "   SMART ROUTE: DYNAMIC WEIGHTED DIRECTED GRAPH (ADJACENCY LIST)\n";
+    output += "================================================================================\n\n";
+
+    graph.vertices.forEach((v, id) => {
+        const edges = graph.adjList.get(id) || [];
+        output += `[Node ${id}] ${v.name.padEnd(30, ' ')} -> \n`;
+        if (edges.length === 0) {
+            output += `    (No outgoing edges)\n`;
+        } else {
+            edges.forEach(e => {
+                const effWeight = (e.distKm * e.trafficFactor).toFixed(2);
+                const forestTag = e.isForest ? " [FOREST HAZARD]" : "";
+                output += `    â†³ to Node ${e.dest} | Road: "${e.roadName}" | Dist: ${e.distKm} km | Traffic: ${e.trafficFactor.toFixed(1)}x | Dynamic Cost: ${effWeight}${forestTag}\n`;
+            });
+        }
+        output += "\n";
+    });
+
+    container.textContent = output;
+    modal.classList.add('active');
+}
+
+let cachedCCode = `/**
+ * SmartRoute: Real-Time Emergency Vehicle Route Optimization
+ * Dynamic Weighted Directed Graph & Dijkstra with Min-Heap
+ * Language: C (ANSI / C99 Standard)
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <float.h>
+#include <time.h>
+
+#define MAX_VERTICES 20
+#define GPS_TIMEOUT_SECONDS 15
+#define FOREST_HAZARD_PENALTY 10.0
+
+// Data Structure: Adjacency List Node
+typedef struct AdjListNode {
+    int dest;
+    double distance_km;
+    double traffic_factor; // 1.0 (Low), 1.8 (Medium), 3.5 (Heavy)
+    bool is_forest_road;
+    char road_name[64];
+    struct AdjListNode* next;
+} AdjListNode;
+
+// Data Structure: Min-Heap Priority Queue for Dijkstra O((V+E)log V)
+typedef struct MinHeapNode {
+    int v;
+    double dist;
+} MinHeapNode;
+
+typedef struct MinHeap {
+    int size;
+    int capacity;
+    int* pos; // O(1) position lookup
+    MinHeapNode** array;
+} MinHeap;
+
+// Dijkstra Shortest Path with Dynamic Weights
+void dijkstra_shortest_path(const Graph* g, int src, int dest, bool avoid_forest, 
+                           int* path_out, int* path_len, double* total_dist, double* total_time_mins) {
+    // 1. Initialize Min-Heap with distances
+    // 2. Extract minimum vertex u
+    // 3. Relax neighbors: weight = dist * traffic_factor + (avoid_forest ? FOREST_HAZARD_PENALTY : 0)
+    // 4. Decrease key in priority queue
+    // 5. Reconstruct shortest path array
+}
+
+// 15-Second GPS Watchdog Timer
+void check_gps_watchdog(Ambulance* amb) {
+    time_t now = time(NULL);
+    double elapsed = difftime(now, amb->last_gps_ping_time);
+    if (elapsed >= GPS_TIMEOUT_SECONDS) {
+        amb->gps_connected = false;
+        printf("!! CRITICAL WARNING: GPS CONNECTION LOST !!\\n");
+        printf("Ambulance ID: %s | Last Known: %.4f, %.4f\\n", amb->ambulance_id, amb->last_known_lat, amb->last_known_lng);
+    }
+}
+
+// Driver Login & Operator Alert
+void driver_login(Ambulance* amb) {
+    amb->driver.is_logged_in = true;
+    printf("[OPERATOR ALERT] Driver %s logged in (Ambulance %s). Vehicle ON DUTY.\\n", 
+           amb->driver.driver_name, amb->ambulance_id);
+}
+
+// Complete source code is located in smartroute.c
+`;
+
+function initCodeInspectorContent() {
+    fetch('smartroute.c')
+        .then(res => res.text())
+        .then(code => {
+            if (code && code.length > 100) {
+                cachedCCode = code;
+            }
+            const container = document.getElementById('cCodeDisplay');
+            if (container) container.textContent = cachedCCode;
+        })
+        .catch(() => {
+            const container = document.getElementById('cCodeDisplay');
+            if (container) container.textContent = cachedCCode;
+        });
+}
+
+function openCodeInspector() {
+    const modal = document.getElementById('modalCodeInspector');
+    if (!cachedCCode) {
+        initCodeInspectorContent();
+    }
+    modal.classList.add('active');
+}
+
+function copyCCode() {
+    if (cachedCCode) {
+        navigator.clipboard.writeText(cachedCCode).then(() => {
+            alert("C source code (smartroute.c) copied to clipboard!");
+        });
+    }
+}
+
+</script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

@@ -1,0 +1,687 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartRoute - Emergency Vehicle Route Optimization (Dynamic Weighted Directed Graphs)</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- TOP CONTROL HEADER -->
+    <header class="top-header">
+        <div class="brand-badge">
+            <div class="brand-icon">
+                <i data-lucide="siren" style="color: white; width: 22px; height: 22px;"></i>
+            </div>
+            <div>
+                <h1 class="brand-title">SmartRoute <span style="font-size:0.75rem; background:rgba(14,165,233,0.2); color:#38bdf8; padding:2px 8px; border-radius:4px; font-weight:600;">v2.4 CAD</span></h1>
+                <p class="brand-subtitle">Emergency Vehicle Route Optimization &bull; Dynamic Weighted Directed Graphs</p>
+            </div>
+        </div>
+
+        <!-- Dual Dashboard Switcher: Operator vs Driver vs Split -->
+        <div class="role-switcher">
+            <button class="role-btn active" id="btnRoleOperator" onclick="switchRole('operator')">
+                <i data-lucide="layout-dashboard" style="width: 16px; height: 16px;"></i>
+                Operator Dashboard
+            </button>
+            <button class="role-btn" id="btnRoleDriver" onclick="switchRole('driver')">
+                <i data-lucide="navigation" style="width: 16px; height: 16px;"></i>
+                Driver Route Terminal
+            </button>
+            <button class="role-btn" id="btnRoleSplit" onclick="switchRole('split')">
+                <i data-lucide="columns" style="width: 16px; height: 16px;"></i>
+                Split Dual View
+            </button>
+        </div>
+
+        <!-- Live Telemetry Status & Actions -->
+        <div class="header-actions">
+            <button class="btn-demo" id="btnUseLiveLocation" onclick="fetchUserLiveLocation()" title="Anchor map and graph to your real area location">
+                <i data-lucide="map-pin" style="width: 15px; height: 15px; color:#38bdf8;"></i>
+                Use My Area Location
+            </button>
+
+            <button class="btn-demo" id="btnOpenDriverLogin" onclick="openDriverLoginModal()">
+                <i data-lucide="user-check" style="width: 15px; height: 15px; color:#10b981;"></i>
+                <span id="headerDriverName">Driver: Rajesh Kumar (AMB-101)</span>
+            </button>
+
+            <div class="gps-live-pill" id="headerGpsPill">
+                <span class="pulse-dot"></span>
+                <span id="headerGpsText">GPS: CONNECTED</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- EMERGENCY BANNERS (Forest Proximity, Forest Entry, GPS Watchdog Loss) -->
+    <div class="alert-banner-container">
+        <!-- Forest Entry Alert Banner (Red) -->
+        <div class="banner-alert red" id="bannerForestEntry">
+            <div class="banner-content">
+                <i data-lucide="alert-octagon" style="width: 24px; height: 24px; color: #ef4444;"></i>
+                <div>
+                    <strong>RED ALERT: AMBULANCE ENTERED PROTECTED FOREST REGION!</strong>
+                    <div style="font-size: 0.8rem; font-weight: 500;">Eco-Sensitive Reserve. Cellular coverage low & wildlife collision hazard. Review route options.</div>
+                </div>
+            </div>
+            <div class="banner-actions">
+                <button class="banner-btn btn-bypass" onclick="driverChooseRoute(true)">Switch to Highway Bypass</button>
+                <button class="banner-btn btn-continue" onclick="driverChooseRoute(false)">Continue Current Route</button>
+            </div>
+        </div>
+
+        <!-- Forest Approaching Warning (Amber) -->
+        <div class="banner-alert amber" id="bannerForestApproach">
+            <div class="banner-content">
+                <i data-lucide="alert-triangle" style="width: 22px; height: 22px; color: #f59e0b;"></i>
+                <div>
+                    <strong>WARNING: You are approaching a Forest Area. Please review the route before proceeding.</strong>
+                    <div style="font-size: 0.78rem; font-weight: 500;" id="bannerForestDistText">Boundary distance: ~450m ahead. Highway bypass available.</div>
+                </div>
+            </div>
+            <div class="banner-actions">
+                <button class="banner-btn btn-bypass" onclick="driverChooseRoute(true)">Pre-emptively Bypass</button>
+                <button class="banner-btn btn-continue" onclick="dismissBanner('bannerForestApproach')">Dismiss</button>
+            </div>
+        </div>
+
+        <!-- GPS Connection Lost Banner (15s Watchdog) -->
+        <div class="banner-alert red" id="bannerGpsLost">
+            <div class="banner-content">
+                <i data-lucide="wifi-off" style="width: 24px; height: 24px; color: #ef4444;"></i>
+                <div>
+                    <strong>GPS CONNECTION LOST â€“ Ambulance location is no longer updating!</strong>
+                    <div style="font-size: 0.8rem; font-weight: 500;" id="bannerGpsLostDetails">
+                        Vehicle: AMB-101 | Last Ping: 16s ago | Displaying estimated dead-reckoning coordinates.
+                    </div>
+                </div>
+            </div>
+            <div class="banner-actions">
+                <button class="banner-btn btn-bypass" onclick="restoreGpsConnection()">Restore GPS Signal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD METRICS (6 KPI Cards) -->
+    <section class="metrics-grid" id="metricsGrid">
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Active Ambulances</span>
+                <i data-lucide="truck" style="width: 16px; height: 16px; color:#38bdf8;"></i>
+            </div>
+            <div class="metric-value" id="kpiActiveAmbulances">4</div>
+            <div class="metric-sub">Fleet ready for dispatch</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Emergency Duty</span>
+                <i data-lucide="flame" style="width: 16px; height: 16px; color:#ef4444;"></i>
+            </div>
+            <div class="metric-value" id="kpiEmergencyDuty" style="color: #ef4444;">1</div>
+            <div class="metric-sub">Active sirens & transit</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Active Routes</span>
+                <i data-lucide="git-branch" style="width: 16px; height: 16px; color:#10b981;"></i>
+            </div>
+            <div class="metric-value" id="kpiActiveRoutes">2</div>
+            <div class="metric-sub">Dijkstra Min-Heap optimal</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>GPS Watchdog</span>
+                <i data-lucide="satellite" style="width: 16px; height: 16px; color:#10b981;"></i>
+            </div>
+            <div class="metric-value" id="kpiGpsStatus" style="color: #10b981; font-size:1.4rem;">CONNECTED</div>
+            <div class="metric-sub" id="kpiGpsSub">Ping delay: 1.0s (15s threshold)</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Forest Warnings</span>
+                <i data-lucide="trees" style="width: 16px; height: 16px; color:#059669;"></i>
+            </div>
+            <div class="metric-value" id="kpiForestStatus" style="font-size:1.4rem; color: #10b981;">CLEAR</div>
+            <div class="metric-sub" id="kpiForestSub">Eco-reserve proximity</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Traffic Status</span>
+                <i data-lucide="activity" style="width: 16px; height: 16px; color:#f59e0b;"></i>
+            </div>
+            <div class="metric-value" id="kpiTrafficStatus" style="font-size:1.4rem; color: #10b981;">OPTIMAL</div>
+            <div class="metric-sub" id="kpiTrafficSub">Dynamic edge weights</div>
+        </div>
+    </section>
+
+    <!-- DEMO & FACULTY EVALUATION CONTROL BAR -->
+    <div class="demo-control-bar">
+        <div class="demo-title-row">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="demo-badge">VIVA / EVALUATION STUDIO</span>
+                <span style="font-size: 0.85rem; font-weight: 600; color: #ffffff;">Interactive Scenario Simulator</span>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn-demo" onclick="openGraphInspector()">
+                    <i data-lucide="network" style="width: 14px; height: 14px; color:#38bdf8;"></i>
+                    Adjacency List
+                </button>
+                <button class="btn-demo" onclick="openCodeInspector()">
+                    <i data-lucide="code" style="width: 14px; height: 14px; color:#10b981;"></i>
+                    View C Program
+                </button>
+            </div>
+        </div>
+
+        <div class="demo-buttons-grid">
+            <button class="btn-demo success" id="btnToggleTracking" onclick="toggleAmbulanceTracking()">
+                <i data-lucide="play" style="width: 14px; height: 14px;"></i>
+                <span id="btnTrackingText">Start GPS Tracking</span>
+            </button>
+            <button class="btn-demo" onclick="simulateApproachForest()">
+                <i data-lucide="compass" style="width: 14px; height: 14px; color:#f59e0b;"></i>
+                Simulate Forest Approach
+            </button>
+            <button class="btn-demo danger" onclick="simulateEnterForest()">
+                <i data-lucide="trees" style="width: 14px; height: 14px; color:#ef4444;"></i>
+                Simulate Forest Entry
+            </button>
+            <button class="btn-demo danger" onclick="simulateGpsLoss()">
+                <i data-lucide="wifi-off" style="width: 14px; height: 14px; color:#ef4444;"></i>
+                Simulate GPS Loss (15s Watchdog)
+            </button>
+            <button class="btn-demo success" onclick="restoreGpsConnection()">
+                <i data-lucide="refresh-cw" style="width: 14px; height: 14px; color:#10b981;"></i>
+                Restore GPS Signal
+            </button>
+            <button class="btn-demo" onclick="simulateTrafficJam()">
+                <i data-lucide="alert-octagon" style="width: 14px; height: 14px; color:#f59e0b;"></i>
+                Inject Heavy Traffic (Reroute)
+            </button>
+            <button class="btn-demo" onclick="recalculateOptimalRoute()">
+                <i data-lucide="zap" style="width: 14px; height: 14px; color:#06b6d4;"></i>
+                Recalculate Dijkstra
+            </button>
+            <button class="btn-demo" onclick="resetDemo()">
+                <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
+                Reset Simulation
+            </button>
+        </div>
+    </div>
+
+    <!-- OPERATOR CONTROL ROOM VIEW (Default) -->
+    <main class="main-content" id="operatorView">
+        <div style="grid-column: 1 / -1;" class="operator-tracking-strip">
+            <div class="tracking-item">
+                <span class="item-label">Tracking Vehicle</span>
+                <span class="item-val" style="color: #38bdf8;">AMB-101 (Active Siren)</span>
+            </div>
+            <div class="tracking-item">
+                <span class="item-label">Current Live Location</span>
+                <span class="item-val" id="stripCurrentPos">17.3850Â° N, 78.4867Â° E &bull; Emergency Scene</span>
+            </div>
+            <div class="tracking-item">
+                <span class="item-label">Where Ambulance Is Going (Destination)</span>
+                <span class="item-val" style="color: #ef4444;" id="stripDestPos">Apollo Trauma Center (Node 7)</span>
+            </div>
+            <div class="tracking-item">
+                <span class="item-label">Upcoming Waypoint</span>
+                <span class="item-val" id="stripNextWaypoint">North Boulevard Junction (350m)</span>
+            </div>
+            <div class="tracking-item">
+                <span class="item-label">Trajectory &bull; Speed</span>
+                <span class="item-val" id="stripSpeedHeading">58 km/h &bull; Heading NE 38Â°</span>
+            </div>
+            <div class="tracking-item">
+                <span class="item-label">Live ETA Countdown</span>
+                <span class="item-val" style="color: #10b981;" id="stripEtaCountdown">5 mins 48s</span>
+            </div>
+        </div>
+
+        <!-- Interactive Moveable Map Container -->
+        <div class="map-container-wrapper" id="mainMapWrapper">
+            <div id="map"></div>
+
+            <!-- Floating Map Controls Toolbar (Moveable/Maximize/Minimize/Recenter) -->
+            <div class="map-controls-toolbar">
+                <button class="map-tool-btn" id="btnToggleMaximize" onclick="toggleMapMaximize()" title="Maximize / Fullscreen Map (F)">
+                    <i data-lucide="maximize-2" id="iconMaximize" style="width: 18px; height: 18px;"></i>
+                </button>
+                <button class="map-tool-btn" id="btnToggleMinimize" onclick="toggleMapMinimize()" title="Minimize / Compact View">
+                    <i data-lucide="minimize-2" id="iconMinimize" style="width: 18px; height: 18px;"></i>
+                </button>
+                <button class="map-tool-btn" id="btnRecenterGps" onclick="recenterToLiveLocation()" title="Recenter on My Live Location">
+                    <i data-lucide="crosshair" style="width: 18px; height: 18px; color: #38bdf8;"></i>
+                </button>
+            </div>
+
+            <!-- Floating Map HUD Overlay -->
+            <div class="map-hud-overlay">
+                <div class="flex justify-between items-center">
+                    <div class="hud-title">Live CAD Telemetry &bull; AMB-101</div>
+                    <span id="hudAreaBadge" style="font-size: 0.68rem; background: rgba(56, 189, 248, 0.2); color:#38bdf8; padding: 1px 6px; border-radius: 4px; font-weight: 600;">Detecting Live Area...</span>
+                </div>
+                <div class="hud-stats">
+                    <div class="hud-stat-item">
+                        <span>Speed:</span> <strong id="hudSpeed">58 km/h</strong>
+                    </div>
+                    <div class="hud-stat-item">
+                        <span>Route ETA:</span> <strong id="hudEta">6 mins</strong>
+                    </div>
+                    <div class="hud-stat-item">
+                        <span>Distance:</span> <strong id="hudDist">10.7 km</strong>
+                    </div>
+                    <div class="hud-stat-item">
+                        <span>Mode:</span> <strong id="hudMode" style="color:#10b981;">Optimal</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Legend -->
+            <div class="map-legend">
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background:#06b6d4;"></div>
+                    <span>Active Emergency Route</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background:#64748b; border: 1px dashed white;"></div>
+                    <span>Alternative / Original Route</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background:rgba(5, 150, 105, 0.7);"></div>
+                    <span>Protected Forest Geofence</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background:#ef4444;"></div>
+                    <span>Heavy Traffic / Congestion</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Side Command & Monitoring Panel -->
+        <aside class="side-panel">
+            <!-- Active Route Summary Card -->
+            <div class="panel-card">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <i data-lucide="route" style="color:#38bdf8; width:18px; height:18px;"></i>
+                        Active Route Details
+                    </h2>
+                    <span class="demo-badge" id="routeTagBadge">Dijkstra Min-Heap</span>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                    Origin: <strong style="color:white;" id="routeOriginName">Emergency Scene</strong>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                    Destination: <strong style="color:#ef4444;" id="routeDestName">Apollo Trauma Center</strong>
+                </div>
+
+                <!-- Node Path Visualizer -->
+                <div style="background: var(--bg-dark); padding: 0.65rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.75rem; color: #38bdf8; word-break: break-all; margin-bottom: 0.75rem;" id="routeNodesText">
+                    Node 0 &rarr; Node 1 &rarr; Node 2 &rarr; Node 3 &rarr; Node 4 &rarr; Node 7
+                </div>
+
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; border-top:1px solid var(--border-color); padding-top:0.5rem;">
+                    <span>Total Length: <strong style="color:white;" id="sideDist">10.7 km</strong></span>
+                    <span>Transit Time: <strong style="color:#10b981;" id="sideEta">~6 mins</strong></span>
+                </div>
+            </div>
+
+            <!-- Ambulance Fleet Status -->
+            <div class="panel-card">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <i data-lucide="shield" style="color:#10b981; width:18px; height:18px;"></i>
+                        Ambulance Fleet
+                    </h2>
+                    <button class="btn-demo" style="padding: 2px 8px; font-size: 0.7rem;" onclick="dispatchNewAmbulance()">+ Dispatch</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; font-size: 0.78rem; text-align: left; border-collapse: collapse;">
+                        <thead>
+                            <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
+                                <th style="padding: 4px 0;">ID</th>
+                                <th>Driver</th>
+                                <th>GPS</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleetTableBody">
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                <td style="padding: 6px 0; font-weight:700; color:#38bdf8;">AMB-101</td>
+                                <td>Rajesh Kumar</td>
+                                <td><span style="color:#10b981;" id="tblGps101">&bull; Active</span></td>
+                                <td><span style="color:#ef4444; font-weight:600;">ON DUTY</span></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                <td style="padding: 6px 0; font-weight:700;">AMB-104</td>
+                                <td>Priya Sharma</td>
+                                <td><span style="color:#10b981;">&bull; Active</span></td>
+                                <td><span style="color:#10b981;">STANDBY</span></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                <td style="padding: 6px 0; font-weight:700;">AMB-202</td>
+                                <td>Vikram Singh</td>
+                                <td><span style="color:#10b981;">&bull; Active</span></td>
+                                <td><span style="color:#10b981;">STANDBY</span></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 0; font-weight:700;">AMB-305</td>
+                                <td>Anil Varma</td>
+                                <td><span style="color:#10b981;">&bull; Active</span></td>
+                                <td><span style="color:#10b981;">STANDBY</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Alerts & Notification Feed -->
+            <div class="panel-card" style="flex: 1;">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <i data-lucide="bell" style="color:#f59e0b; width:18px; height:18px;"></i>
+                        Control Center Alerts
+                    </h2>
+                    <span style="font-size:0.75rem; color:var(--text-muted); cursor:pointer;" onclick="clearAlerts()">Clear</span>
+                </div>
+                <div class="alert-feed" id="alertFeedContainer">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- DRIVER CABIN IN-CAB HUD VIEW (Driver Friendly, Focused on THE ROUTE) -->
+    <section class="driver-cabin-view" id="driverCabinView">
+        <div class="driver-hud-card">
+            <!-- Driver Profile Header -->
+            <div class="driver-profile-header">
+                <div class="driver-info-box">
+                    <h2 id="cabDriverName">Driver: Rajesh Kumar</h2>
+                    <p>Ambulance ID: <strong style="color:#38bdf8;" id="cabAmbulanceId">AMB-101</strong> &bull; Emergency Unit: Type-C Advanced Cardiac</p>
+                </div>
+                <div style="text-align: right;">
+                    <div class="gps-live-pill" id="cabGpsPill" style="display:inline-flex;">
+                        <span class="pulse-dot"></span>
+                        <span id="cabGpsText">GPS ACTIVE</span>
+                    </div>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Destination: Apollo Trauma Center</p>
+                </div>
+            </div>
+
+            <!-- In-Cab Interactive Route Map (Focused purely on THE ROUTE) -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
+                <span style="font-size:0.85rem; font-weight:700; color:var(--cyber-cyan); text-transform:uppercase; letter-spacing:0.05em; display:flex; items-center; gap:0.4rem;">
+                    <i data-lucide="map" style="width:16px; height:16px;"></i> Active Route Navigation View
+                </span>
+                <span id="driverRouteModeBadge" style="font-size:0.75rem; background:rgba(6,182,212,0.15); color:#06b6d4; border:1px solid #06b6d4; padding:2px 8px; border-radius:4px; font-weight:700;">Dijkstra Optimal Route</span>
+            </div>
+            
+            <div class="driver-route-map-box">
+                <div id="driverRouteMap"></div>
+            </div>
+
+            <!-- Turn Guidance HUD -->
+            <div class="driver-turn-instruction">
+                <div class="driver-turn-icon" id="turnIcon">
+                    <i data-lucide="arrow-up-right" style="width: 40px; height: 40px;"></i>
+                </div>
+                <div class="driver-turn-text">
+                    <h3 id="turnInstructionTitle">Continue Straight on Boulevard Link</h3>
+                    <p id="turnInstructionSub">Approaching North Boulevard Junction in 1.2 km &bull; Traffic Free</p>
+                </div>
+            </div>
+
+            <!-- Route Waypoints Breadcrumb Strip -->
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 0.25rem;">Upcoming Route Waypoints:</div>
+            <div class="driver-waypoint-strip" id="driverWaypointStrip">
+                <div class="driver-waypoint-pill active"><span>0</span> Origin</div>
+                <div class="driver-waypoint-pill"><span>1</span> North Junc</div>
+                <div class="driver-waypoint-pill"><span>2</span> Forest Approach</div>
+                <div class="driver-waypoint-pill"><span>3</span> Forest S. Gate</div>
+                <div class="driver-waypoint-pill"><span>4</span> Canopy Track</div>
+                <div class="driver-waypoint-pill" style="border-color:#ef4444; color:#fca5a5;"><span>7</span> Apollo Hospital</div>
+            </div>
+
+            <!-- Big Telemetry Gauges -->
+            <div class="driver-telemetry-grid">
+                <div class="telemetry-tile">
+                    <div class="label">Current Speed</div>
+                    <div class="val" id="cabSpeedVal">58 <span style="font-size: 1rem; color:var(--text-muted);">km/h</span></div>
+                </div>
+                <div class="telemetry-tile">
+                    <div class="label">Estimated Arrival (ETA)</div>
+                    <div class="val" id="cabEtaVal" style="color: #10b981;">6 <span style="font-size: 1rem; color:var(--text-muted);">mins</span></div>
+                </div>
+                <div class="telemetry-tile">
+                    <div class="label">Distance to Hospital</div>
+                    <div class="val" id="cabDistVal">10.7 <span style="font-size: 1rem; color:var(--text-muted);">km</span></div>
+                </div>
+            </div>
+
+            <!-- Driver Decision Prompt (Shows when entering Forest Area) -->
+            <div class="driver-decision-panel" id="cabDecisionPanel">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i data-lucide="trees" style="width: 28px; height: 28px; color: #ef4444;"></i>
+                    <div>
+                        <h4 style="font-size: 1.15rem; color: white;">FOREST REGION ENTRY AHEAD</h4>
+                        <p style="font-size: 0.85rem; color: #fca5a5;">
+                            Zero cellular signal zone with wildlife hazard. An alternate 4-lane highway bypass is available.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="decision-actions">
+                    <button class="btn-big-choice btn-bypass" onclick="driverChooseRoute(true)">
+                        <i data-lucide="shield-check" style="width: 18px; height: 18px; display:inline; vertical-align:middle; margin-right:6px;"></i>
+                        Take Safe Highway Bypass
+                    </button>
+                    <button class="btn-big-choice btn-continue" onclick="driverChooseRoute(false)">
+                        <i data-lucide="arrow-right" style="width: 18px; height: 18px; display:inline; vertical-align:middle; margin-right:6px;"></i>
+                        Continue Through Forest
+                    </button>
+                </div>
+            </div>
+
+            <!-- Driver Quick Status Update Buttons -->
+            <div style="margin-top: 1.5rem;">
+                <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:0.4rem;">Driver Duty Status (Notifies Operator CAD):</div>
+                <div class="driver-status-bar">
+                    <button class="btn-driver-status active" id="btnStatusDuty" onclick="setDriverStatus('duty')">
+                        ðŸš¨ En Route to Patient
+                    </button>
+                    <button class="btn-driver-status" id="btnStatusCritical" onclick="setDriverStatus('critical')">
+                        ðŸš‘ Patient Onboard (Critical Priority 1)
+                    </button>
+                    <button class="btn-driver-status" id="btnStatusArrived" onclick="setDriverStatus('arrived')">
+                        ðŸ¥ Arrived at Hospital
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; text-align: center;">
+                <button class="btn-demo" onclick="switchRole('operator')" style="display: inline-flex; padding: 0.6rem 1.25rem;">
+                    <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i>
+                    Switch to Operator CAD Dashboard
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- DUAL SPLIT-SCREEN VIEW (Both Operator & Driver Side-by-Side) -->
+    <section class="dual-split-container" id="dualSplitContainer">
+        <!-- Left: Operator CAD View Summary -->
+        <div class="panel-card" style="display: flex; flex-direction: column;">
+            <div class="panel-header">
+                <h3 class="panel-title" style="color: #38bdf8;">
+                    <i data-lucide="layout-dashboard"></i> OPERATOR CAD &bull; Live Location &amp; Target
+                </h3>
+                <span class="demo-badge">Control Center</span>
+            </div>
+            <div id="splitOperatorInfo" style="font-size: 0.85rem; margin-bottom: 0.75rem; color: var(--text-secondary);">
+                Tracking: <strong style="color:white;">AMB-101</strong> | Destination: <strong style="color:#ef4444;">Apollo Trauma Center</strong>
+            </div>
+            <div style="background:var(--bg-dark); padding:0.75rem; border-radius:8px; font-family:var(--font-mono); font-size:0.8rem; margin-bottom:1rem;">
+                <div>ðŸ“ Live GPS: <span id="splitLiveCoords" style="color:#38bdf8;">17.3850Â° N, 78.4867Â° E</span></div>
+                <div>ðŸŽ¯ Going To: <span style="color:#10b981;">Metro Apollo Trauma (Node 7)</span></div>
+                <div>âš¡ Speed: <span id="splitSpeed">58 km/h</span> | Bearing: <span>NE 38Â°</span></div>
+                <div>â±ï¸ Countdown ETA: <span id="splitEta" style="color:#10b981;">6 mins</span></div>
+            </div>
+            <div style="flex:1; border: 1px solid var(--border-color); border-radius:8px; overflow:hidden; min-height: 280px; position: relative;" id="splitMapContainer">
+                <!-- Mirrored or interactive canvas -->
+                <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:#0c1322; color:var(--text-secondary); font-size:0.85rem; text-align:center; padding:1rem;">
+                    <div>
+                        <div style="font-size:2rem; margin-bottom:0.5rem;">ðŸ¢</div>
+                        <strong>Central CAD Station Synchronized</strong>
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Monitoring where AMB-101 is moving in real-time</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Driver In-Cab Navigation Summary -->
+        <div class="panel-card" style="display: flex; flex-direction: column;">
+            <div class="panel-header">
+                <h3 class="panel-title" style="color: #10b981;">
+                    <i data-lucide="navigation"></i> DRIVER TERMINAL &bull; Their Active Route
+                </h3>
+                <span class="demo-badge" style="background:rgba(16,185,129,0.2); color:#10b981; border-color:#10b981;">In-Cab Screen</span>
+            </div>
+            <div style="background: rgba(14, 165, 233, 0.1); border-left: 4px solid var(--cyber-blue); padding: 0.75rem; border-radius: 6px; margin-bottom: 0.75rem;">
+                <div style="font-weight: 800; font-size: 0.95rem; color: white;" id="splitTurnTitle">Turn Right onto Boulevard Link</div>
+                <div style="font-size: 0.78rem; color: var(--text-secondary);" id="splitTurnSub">In 400m approach North Junction</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; background:var(--bg-dark); padding:0.6rem 0.85rem; border-radius:8px; font-size:0.8rem; margin-bottom:1rem;">
+                <span>Route: <strong id="splitRouteTag" style="color:#06b6d4;">Dijkstra Optimal</strong></span>
+                <span>Distance: <strong id="splitDist" style="color:white;">10.7 km</strong></span>
+                <span>Speed Limit: <strong style="color:#f59e0b;">60 km/h</strong></span>
+            </div>
+            <div style="background:rgba(239,68,68,0.1); border:1px solid var(--emergency-red); border-radius:8px; padding:0.75rem; text-align:center;">
+                <div style="font-size:0.82rem; font-weight:700; color:#fca5a5; margin-bottom:0.4rem;">Driver Route Choice Action:</div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="banner-btn btn-bypass" style="flex:1;" onclick="driverChooseRoute(true)">Switch Highway Bypass</button>
+                    <button class="banner-btn btn-continue" style="flex:1;" onclick="driverChooseRoute(false)">Continue Route</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MODAL 1: DRIVER PROFILE LOGIN -->
+    <div class="modal-backdrop" id="modalDriverLogin">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>Ambulance Driver Login Profile</h3>
+                <button class="modal-close-btn" onclick="closeModal('modalDriverLogin')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                    Select or enter your driver credentials. Logging in automatically notifies the Central CAD Operator.
+                </p>
+
+                <!-- Quick Profile Selectors -->
+                <div class="profile-quick-picks">
+                    <div class="quick-pick-card selected" onclick="selectQuickProfile('Rajesh Kumar', 'DRV-842', 'AMB-101', this)">
+                        <strong style="color:white; font-size:0.85rem;">Rajesh Kumar</strong>
+                        <div style="font-size:0.75rem; color:#38bdf8;">AMB-101 (Duty)</div>
+                    </div>
+                    <div class="quick-pick-card" onclick="selectQuickProfile('Priya Sharma', 'DRV-519', 'AMB-104', this)">
+                        <strong style="color:white; font-size:0.85rem;">Priya Sharma</strong>
+                        <div style="font-size:0.75rem; color:#10b981;">AMB-104</div>
+                    </div>
+                    <div class="quick-pick-card" onclick="selectQuickProfile('Vikram Singh', 'DRV-303', 'AMB-202', this)">
+                        <strong style="color:white; font-size:0.85rem;">Vikram Singh</strong>
+                        <div style="font-size:0.75rem; color:#10b981;">AMB-202</div>
+                    </div>
+                </div>
+
+                <form onsubmit="handleDriverLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">Driver Full Name</label>
+                        <input type="text" id="loginDriverName" class="form-input" value="Rajesh Kumar" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Driver ID / Badge Number</label>
+                        <input type="text" id="loginDriverId" class="form-input" value="DRV-842" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Assigned Ambulance ID</label>
+                        <select id="loginAmbulanceId" class="form-select">
+                            <option value="AMB-101" selected>AMB-101 (Advanced Cardiac ICU)</option>
+                            <option value="AMB-104">AMB-104 (Basic Life Support)</option>
+                            <option value="AMB-202">AMB-202 (Trauma Response Unit)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary" style="margin-top: 0.5rem;">
+                        Authenticate &amp; Notify Control Operator
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: GRAPH DATA STRUCTURE & ADJACENCY LIST INSPECTOR -->
+    <div class="modal-backdrop" id="modalGraphInspector">
+        <div class="modal-window large">
+            <div class="modal-header">
+                <h3>Dynamic Weighted Directed Graph: Adjacency List &amp; Weights</h3>
+                <button class="modal-close-btn" onclick="closeModal('modalGraphInspector')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 0.85rem; font-size: 0.85rem; color: var(--text-secondary);">
+                    <strong>Data Structure Concepts:</strong> Intersections = Vertices ($V$), Roads = Directed Edges ($E$).
+                    Weights dynamically calculated: $\text{Weight} = \text{Distance} \times \text{TrafficMultiplier} + \text{ForestPenalty}$.
+                </div>
+                <div class="code-container" id="graphAdjacencyListContent">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: PURE C SOURCE CODE INSPECTOR -->
+    <div class="modal-backdrop" id="modalCodeInspector">
+        <div class="modal-window large">
+            <div class="modal-header">
+                <h3>C Program Implementation (smartroute.c)</h3>
+                <button class="modal-close-btn" onclick="closeModal('modalCodeInspector')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                    <span style="font-size:0.85rem; color:var(--text-secondary);">
+                        Standard C99 Code &bull; Min-Heap Priority Queue &bull; Complexity: $O((V + E) \log V)$
+                    </span>
+                    <button class="btn-demo" onclick="copyCCode()">Copy Code</button>
+                </div>
+                <div class="code-container" id="cCodeDisplay">
+                    <!-- Loaded dynamically from smartroute.c -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="graph.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
